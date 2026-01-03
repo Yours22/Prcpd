@@ -79,5 +79,5 @@ if __name__ == "__main__":
     
     X = build_input_dataset(INPUT_DIR, NUM_SAMPLES)
     
-    np.save('./data-gen/X_inputs.npy', X)
-    print("X_inputs.npy 已保存。")
+    np.save('./data-gen/inputs.npy', X)
+    print("inputs.npy 已保存。")
