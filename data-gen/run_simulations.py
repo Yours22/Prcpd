@@ -3,10 +3,7 @@ import subprocess
 import time
 
 FEMFFUSION_EXE = os.path.abspath("./FEMFFUSION/femffusion.exe")
-
-# 数据文件夹
 DATA_DIR = "dataset_raw"
-# ===========================================
 
 def run_simulations():
     all_files = os.listdir(DATA_DIR)
