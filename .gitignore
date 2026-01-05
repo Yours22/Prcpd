@@ -1,3 +1,6 @@
 /FEMFFUSION
 /dataset_raw
 /data-gen/*.npy
+/.venv
+.python-version
+uv.lock
