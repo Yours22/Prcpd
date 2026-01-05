@@ -1,16 +1,17 @@
 [project]
-name = prcpd"
+name = "prcpd"
 version = "0.1.0"
 description = "Nuclear Engineering & ML Thesis Environment"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy",          
-    "matplotlib",     
-    "pandas",         
-    "scipy",          
-    "torch",          
-    "torchvision",    
-    "jupyterlab",     
+    "numpy",
+    "matplotlib",
+    "pandas",
+    "scipy",
+    "torch",
+    "torchvision",
+    "jupyterlab",
+    "scikit-learn>=1.7.2",
 ]
 
 

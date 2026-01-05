@@ -23,8 +23,10 @@ def data_processing():
         inputs,outputs,test_size=0.2,random_state=42
     )
 
-    print(f"训练集样本数 (N1): {Y_raw_train.shape[0]}")
-    print(f"测试集样本数 (N2): {Y_raw_test.shape[0]}")
+    print(f"X_train.shape: {X_train.shape[0]}")
+    print(f"X_test.shape: {X_test.shape[0]}")
+    print(f"Y_raw_train.shape: {Y_raw_train.shape[0]}")
+    print(f"Y_raw_test.shape: {Y_raw_test.shape[0]}")
 
     N1= Y_raw_train.shape[0]
     U_snapshot = Y_raw_train.reshape(N1,-1).T
