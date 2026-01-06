@@ -95,7 +95,7 @@ plt.ylabel(f'Predicted Coefficient (Mode {R_MODES})')
 plt.title(f'Mode {R_MODES} Correlation (R2={r2_values[last_idx]:.4f})')
 plt.grid(True)
 plt.tight_layout()
-plt.savefig(f'Mode {R_MODES} Correlation (R2={r2_values[last_idx]:.4f}).png')
+plt.savefig(f'Mode {R_MODES} Correlation.png')
 
 # --- 图 2: 关键安全参数误差 ---
 # 计算每个样本的峰值功率和相对误差
@@ -146,4 +146,4 @@ plt.ylabel('Max Core Power (W/cm^3)')
 plt.title(f'Transient Evolution of Worst Sample (Idx: {worst_sample_idx})')
 plt.legend()
 plt.grid(True)
-plt.savefig(f'Transient Evolution of Worst Sample (Idx: {worst_sample_idx})')
+plt.savefig('Transient Evolution of Worst Sample.png')

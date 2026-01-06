@@ -21,11 +21,11 @@ def check_environment():
             x = torch.tensor([1.0, 2.0]).cuda()
             print("\nTensor operation on GPU successful.")
         except Exception as e:
-            print(f"\n❌ Error: GPU detected but operation failed. \n{e}")
+            print(f"\nError: GPU detected but operation failed. \n{e}")
             
     else:
-        print("❌ CUDA is NOT available. Using CPU.")
-        print("   可能的解决方案: 使用 uv add torch --index-url https://download.pytorch.org/whl/cu124 重新安装")
+        print("CUDA is NOT available. Using CPU.")
+        print("可能的解决方案: 使用 uv add torch --index-url https://download.pytorch.org/whl/cu124 重新安装")
 
 if __name__ == "__main__":
     check_environment()

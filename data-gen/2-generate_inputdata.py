@@ -22,7 +22,7 @@ def perturb_value(match):
     return f"{new_value:.6e}"
 
 def generate_perturbed_xsec(content):
-    """ 智能解析函数：只扰动 XSecs 部分 """
+    """ 解析函数：只扰动 XSecs 部分 """
     lines = content.splitlines()
     new_lines = []
     in_xsecs_block = False
