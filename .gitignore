@@ -4,3 +4,6 @@
 /.venv
 .python-version
 uv.lock
+*.npz
+*.pth
+*.pkl
