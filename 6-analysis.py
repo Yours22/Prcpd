@@ -6,14 +6,10 @@ import joblib
 import os
 from sklearn.metrics import r2_score
 
-# ================= 配置 =================
 DATA_DIR = '.\\data-gen'
 INPUT_DIM = 27
 R_MODES = 5  # 之前训练时保留的模态数
 
-# ================= 1. 加载资源 =================
-print(">>> Loading resources...")
-# 加载数据
 inputs = np.load(os.path.join(DATA_DIR, 'inputs.npy'))
 outputs = np.load(os.path.join(DATA_DIR, 'outputs.npy'))
 comps = np.load(os.path.join(DATA_DIR, 'pod_components.npz'))
@@ -21,7 +17,7 @@ Phi_r = comps['Phi_r']      # (320000, 5)
 mean_vec = comps['mean_vec'] # (320000, 1)
 
 # 真实的测试集系数 (从 npz 中恢复或者重新计算，这里为了方便直接取 npz)
-# 注意这里重新切分测试集以确保索引对应
+# 注意这里重新切分测试集以确保索引对应，记得保证随机数种子一样
 from sklearn.model_selection import train_test_split
 _, X_test_raw, _, Y_test_raw = train_test_split(inputs, outputs, test_size=0.2, random_state=42)
 
