@@ -15,15 +15,13 @@ dependencies = [
 ]
 
 
-# 定义 PyTorch 的专用源
+# PyTorch 的专用源
 [[tool.uv.index]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu124"
-explicit = true   # <--- 核心！告诉 uv：除非我点名，否则别来这找包(比如numpy)
+explicit = true 
 
 # 只有 torch 相关包去上面的 pytorch 源下载
 [tool.uv.sources]
 torch = [{ index = "pytorch" }]
 torchvision = [{ index = "pytorch" }]
-
-# --- 关键配置结束 ---
