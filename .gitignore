@@ -7,3 +7,5 @@ uv.lock
 *.npz
 *.pth
 *.pkl
+*.ipynb
+/notes

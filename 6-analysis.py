@@ -9,6 +9,7 @@ from sklearn.metrics import r2_score
 DATA_DIR = '.\\data-gen'
 INPUT_DIM = 27
 R_MODES = 5  # 之前训练时保留的模态数
+img_save_path = './image'
 
 inputs = np.load(os.path.join(DATA_DIR, 'inputs.npy'))
 outputs = np.load(os.path.join(DATA_DIR, 'outputs.npy'))
@@ -91,7 +92,7 @@ plt.ylabel(f'Predicted Coefficient (Mode {R_MODES})')
 plt.title(f'Mode {R_MODES} Correlation (R2={r2_values[last_idx]:.4f})')
 plt.grid(True)
 plt.tight_layout()
-plt.savefig(f'Mode {R_MODES} Correlation.png')
+plt.savefig(f'{img_save_path}/Mode {R_MODES} Correlation.png')
 
 # --- 图 2: 关键安全参数误差 ---
 # 计算每个样本的峰值功率和相对误差
@@ -114,7 +115,7 @@ plt.xlabel('Peak Power Relative Error (%)')
 plt.ylabel('Number of Samples')
 plt.title('Error Distribution of Peak Power')
 plt.grid(True)
-plt.savefig('Error Distribution of Peak Power')
+plt.savefig(f'{img_save_path}/Error Distribution of Peak Power')
 
 # --- 图 3: 最差样本的时间演变诊断 ---
 # 还原该样本的时间序列 (假设 T=100)
@@ -142,4 +143,4 @@ plt.ylabel('Max Core Power (W/cm^3)')
 plt.title(f'Transient Evolution of Worst Sample (Idx: {worst_sample_idx})')
 plt.legend()
 plt.grid(True)
-plt.savefig('Transient Evolution of Worst Sample.png')
+plt.savefig(f'{img_save_path}/Transient Evolution of Worst Sample.png')

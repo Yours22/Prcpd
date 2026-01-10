@@ -56,8 +56,8 @@ $$U_{pred} = \Phi_{Truncated} \cdot \text{DNN}(Inputs)$$
 
 ## 4. 复现结果分析
 ### 4.1 femffusion产生的原始数据
- <img src="./data_validation_plots.png" width = "" height = "600" alt="图片名称" align=center />
- <img src="./power_analysis_plot.png" width = "" height = "600" alt="图片名称" align=center />
+ <img src="./image//data_validation_plots.png" width = "" height = "600" alt="图片名称" align=center />
+ <img src="./image//power_analysis_plot.png" width = "" height = "600" alt="图片名称" align=center />
 
  ## 4. 复现结果分析 (Results Analysis)
 
@@ -66,7 +66,7 @@ $$U_{pred} = \Phi_{Truncated} \cdot \text{DNN}(Inputs)$$
 ### 4.2 训练收敛性与重构能力 (Training & Reconstruction)
 训练过程的损失函数（Loss）变化及训练集上的重构效果如下图所示：
 
- <img src="./TrainResults.png" width = "" height = "" alt="图片名称"  align=center />
+ <img src="./image//training_report.png" width = "" height = "" alt="图片名称"  align=center />
 
 * **收敛表现**：左图显示，模型训练过程中的 Loss 迅速下降并最终稳定在 $10^{-14}$ 量级。这表明 DNN 网络具有足够的深度和容量来拟合从输入参数（截面扰动）到输出系数（POD 系数）的复杂映射关系。中间出现的尖峰对应于学习率调度器（Scheduler）的动态调整，有助于模型跳出局部极小值。
 * **重构验证**：右图展示了样本 0 的时空快照重构对比。预测曲线（橙色虚线）与真实值（蓝色实线）在所有时间步上几乎完全重合，证明了 POD 方法提取的基向量能够完备地表达原物理场的时空特征。
@@ -74,7 +74,7 @@ $$U_{pred} = \Phi_{Truncated} \cdot \text{DNN}(Inputs)$$
 ### 4.2 模态系数预测精度 (Prediction of POD Coefficients)
 为了验证 DNN 对降阶系数的预测能力，我们选取了能量占比最高的主模态（Mode 1）和较高阶模态（Mode 5）进行回归分析：
 
- <img src="./Mode 5 Correlation.png" width = "" height = "" alt="图片名称"  align=center />
+ <img src="./image//Mode 5 Correlation.png" width = "" height = "" alt="图片名称"  align=center />
 
 * **相关性分析**：测试集上的预测系数与真实系数呈现出较高的线性相关性。
     * **Mode 1 ($R^2=0.9757$)**：作为能量主导模态，其预测精度直接决定了整体功率水平的准确性。
@@ -83,7 +83,7 @@ $$U_{pred} = \Phi_{Truncated} \cdot \text{DNN}(Inputs)$$
 ### 4.3 瞬态演化与最差样本分析 (Transient Evolution)
 为了评估模型的鲁棒性，筛选出测试集中预测误差最大的样本（Worst Sample, Index 5），并绘制了其核心最大功率随时间的变化曲线：
 
- <img src="./Transient Evolution of Worst Sample.png" width = "600" height = "" alt="图片名称"  align=center />
+ <img src="./image//Transient Evolution of Worst Sample.png" width = "600" height = "" alt="图片名称"  align=center />
 
 
 * **趋势捕捉**：即便是在表现最差的样本中，POD-DNN（红色虚线）也高度还原了 FEMFFUSION 计算（黑色实线）的瞬态全过程。模型准确捕捉了 $t=0s$ 到 $t=0.2s$ 期间由于斜坡扰动（Ramp Perturbation）引起的功率非线性上升，以及 $t>0.2s$ 后的增长趋势。
@@ -92,7 +92,7 @@ $$U_{pred} = \Phi_{Truncated} \cdot \text{DNN}(Inputs)$$
 ### 4.4 峰值功率误差统计分布 (Error Statistics)
 最后，我们统计了测试集中所有样本的峰值功率相对误差（Peak Power Relative Error），结果如下直方图所示：
 
- <img src="./Error Distribution of Peak Power.png" width = "400" height = "" alt="图片名称"  align=center />
+ <img src="./image//Error Distribution of Peak Power.png" width = "400" height = "" alt="图片名称"  align=center />
 
 * **误差分布**：误差分布呈现以 0 为中心的类高斯分布，绝大多数样本的预测误差集中在 **0.0% ~ 0.2%** 的极低区间内。
 * **精度水平**：

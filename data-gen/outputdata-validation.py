@@ -70,7 +70,7 @@ final_p = relative_power[-1]
 axes[0, 1].text(time_axis[-1], final_p, f' {final_p:.2f}', va='center', fontsize=10, color='#d62728')
 
 
-# === 第三块图：对角线分布 (保持不变) ===
+# === 第三块图：对角线功率分布===
 time_slice = 75 # 选择观察的时刻
 flux_snapshot = sample_out[time_slice] 
 grid_size = 40 # 假设 40x40 = 1600
@@ -90,14 +90,14 @@ axes[1, 0].set_ylabel('Flux')
 axes[1, 0].legend()
 axes[1, 0].grid(True, alpha=0.3)
 
-# === 第四块图：热群通量分布热力图 (修改为热群通常更有代表性) ===
+# === 第四块图：热群通量分布热力图 ===
 im4 = axes[1, 1].imshow(thermal_flux_2d, cmap='inferno', origin='lower') # origin='lower' 符合物理坐标习惯
 axes[1, 1].set_title(f'Thermal Flux Map at t={time_axis[time_slice]:.3f}s')
 plt.colorbar(im4, ax=axes[1, 1], label='Flux Magnitude')
 
 # --- 保存与显示 ---
 plt.tight_layout()
-save_path = 'power_analysis_plot.png'
+save_path = './image/power_analysis_plot.png'
 plt.savefig(save_path, dpi=300)
 print(f"绘图完成！图片已保存至 {save_path}")
 print(f"样本 {sample_idx} 的最终相对功率: {final_p:.4f}")
