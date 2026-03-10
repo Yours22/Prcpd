@@ -10,7 +10,7 @@ import numpy as np
 # 配置路径
 # ==========================================
 RAW_DATA_DIR = "data-raw/2D_TWIGL_diff"
-CSV_FILE = "data-gen/dataset_parameters.csv"
+CSV_FILE = "data-gen/dataset_parameters_cleaned.csv"
 OUTPUT_IMG_DIR = "data-check-plots"
 
 os.makedirs(OUTPUT_IMG_DIR, exist_ok=True)
@@ -38,82 +38,11 @@ def plot_parameter_space():
     cbar = plt.colorbar(scatter)
     cbar.set_label('Material Changing (1: Core, 3: Rod)', fontsize=10)
     
-    out_path = os.path.join(OUTPUT_IMG_DIR, "Fig4_Parameter_Space.png")
+    out_path = os.path.join(OUTPUT_IMG_DIR, "Fig4_Parameter_Space-1.png")
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f" -> 已保存至 {out_path}")
 
-def plot_power_curves(num_samples=10):
-    """图 1：绘制归一化总功率随时间演化曲线"""
-    print(f"正在绘制 图1：总功率演化曲线 (抽取 {num_samples} 个算例)...")
-    
-    out_files = glob.glob(os.path.join(RAW_DATA_DIR, "case_*", "*.out"))
-    if not out_files:
-        print("找不到任何 .out 文件，请检查路径。")
-        return
-        
-    np.random.shuffle(out_files)
-    selected_files = out_files[:num_samples]
-    
-    plt.figure(figsize=(10, 6))
-    
-    for file in selected_files:
-        times = []
-        powers = []
-        case_name = os.path.basename(file).split('.')[0]
-        
-        mode = None # 记录当前读取的状态
-        
-        with open(file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # 状态机：遇到特定的表头，切换读取模式
-                if "Time vector" in line:
-                    mode = "time"
-                    continue
-                elif "Total Power vector" in line:
-                    mode = "power"
-                    continue
-                elif "Error estimation" in line or "CPU Time" in line:
-                    mode = None # 遇到其他无关表头，停止读取
-                    continue
-                
-                # 根据当前模式提取数据
-                if mode == "time":
-                    try:
-                        vals = [float(x) for x in line.split()]
-                        times.extend(vals)
-                    except ValueError:
-                        mode = None
-                elif mode == "power":
-                    try:
-                        vals = [float(x) for x in line.split()]
-                        powers.extend(vals)
-                    except ValueError:
-                        mode = None
-        
-        if times and powers:
-            # 确保时间数组和功率数组长度匹配
-            min_len = min(len(times), len(powers))
-            times = times[:min_len]
-            powers = powers[:min_len]
-            
-            p0 = powers[0]
-            normalized_powers = [p / p0 for p in powers]
-            plt.plot(times, normalized_powers, alpha=0.7, linewidth=2, label=case_name)
-
-    plt.title("Normalized Total Power Transient Response", fontsize=14)
-    plt.xlabel("Time [s]", fontsize=12)
-    plt.ylabel("Relative Power P(t)/P(0)", fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.6)
-    
-    out_path = os.path.join(OUTPUT_IMG_DIR, "Fig1_Power_Curves.png")
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f" -> 已保存至 {out_path}")
 
 def plot_flux_vtk(vtk_file, out_name, title_text):
     """通用的 VTK 云图绘制函数 (图2 和 图3 使用)"""
@@ -186,7 +115,6 @@ if __name__ == "__main__":
     print("==================================================")
     
     plot_parameter_space()
-    plot_power_curves(num_samples=8)
     plot_spatial_snapshots()
     
     print("==================================================")
