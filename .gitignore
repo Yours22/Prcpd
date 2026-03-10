@@ -1,6 +1,9 @@
 /FEMFFUSION
-/dataset_raw
+/backup
+/backup/*
+/data-raw/*
 /data-gen/*.npy
+/data-gen/prm-cases/*
 /.venv
 .python-version
 uv.lock
@@ -9,3 +12,5 @@ uv.lock
 *.pkl
 *.ipynb
 /notes
+/__pycache__
+/data-check-plots/*

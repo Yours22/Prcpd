@@ -18,7 +18,7 @@ set N_SPN                = 1
 set Print_Grid_Flag     = false
 
 # True/false - Make a .vtk file with the output 
-set Output_Flag         = false
+set Output_Flag         = true
 
 # Number of Refinements per cell in the .vtk output
 set Out_Refinements     = 3
@@ -49,10 +49,10 @@ set Cell_Pitch_y        = 10* 8.0
 #
 # FILENAMES
 # Filename where it is stored the material cross section
-set XSECS_Filename      = examples/2D_TWIGL/twigl_quarter.xsec
+set XSECS_Filename      = data-gen/2D_TWIGL/twigl_quarter.xsec
 
 # Filename where will be written the output
-set Output_Filename     = examples/2D_TWIGL/twigl_sp1_ramp.out
+set Output_Filename     = data-raw/2D_TWIGL_sp1/twigl_sp1_ramp.out
 
 # Solver Type (power_it | gd | bifpam | bifpam)
 set Solver_Type         = gd

@@ -43,10 +43,10 @@ set Cell_Pitch_y        = 10* 8.0
 #
 # FILENAMES
 # Filename where it is stored the material cross section
-set XSECS_Filename      = twigl_quarter.xsec
+set XSECS_Filename      = data-gen/2D_TWIGL/twigl_quarter.xsec
 
 # Filename where will be written the output
-set Output_Filename     = ../result/twigl_sp1_ramp.out
+set Output_Filename     = data-raw/2D_TWIGL_diff/twigl_diff_ramp.out
 
 # Solver Type (power_it | gd | bifpam | bifpam)
 set Solver_Type         = gd

@@ -12,6 +12,7 @@ dependencies = [
     "torchvision",
     "jupyterlab",
     "scikit-learn>=1.7.2",
+    "pyvista>=0.47.1",
 ]
 
 
