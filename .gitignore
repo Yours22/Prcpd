@@ -3,7 +3,7 @@
 /backup/*
 /data-raw/*
 /data-gen/*.npy
-/data-gen/prm-cases/*
+/data-gen/prm_cases/*
 /.venv
 .python-version
 uv.lock
