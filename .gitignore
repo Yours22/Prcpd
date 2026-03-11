@@ -16,3 +16,4 @@ backup/dataset_raw/outputs/
 __pycache__/
 *.py[cod]
 *$py.class
+prm_cases/*

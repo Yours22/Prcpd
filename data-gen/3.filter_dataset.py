@@ -6,8 +6,8 @@ import pandas as pd
 # 1. 运行配置与物理阈值
 # ==========================================
 RAW_DATA_DIR = "data-raw/2D_TWIGL_diff"
-ORIGINAL_CSV = "data-gen/dataset_parameters.csv"
-CLEANED_CSV  = "data-gen/dataset_parameters_cleaned.csv"
+ORIGINAL_CSV = "dataset_parameters.csv"
+CLEANED_CSV  = "dataset_parameters_cleaned.csv"
 
 # 物理与数值稳定性判定标准
 MAX_POWER_RATIO = 50.0   # 阈值：相对功率如果超过初始值的 50 倍，判定为数值发散 (爆炸)

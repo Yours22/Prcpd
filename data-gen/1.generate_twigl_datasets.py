@@ -7,7 +7,7 @@ from scipy.stats import qmc
 # =====================================================================
 # [1] 运行时需调整的全局配置参数 (Runtime Configurations)
 # =====================================================================
-NUM_CASES = 250  # 计划生成的算例总数
+NUM_CASES = 2500  # 计划生成的算例总数
 
 # 连续物理参数 LHS 采样范围
 SLOPE_BOUNDS = [-0.3, -0.01]  # 扰动斜率 (Slope_Up) 的范围
@@ -21,7 +21,7 @@ GROUP_CHOICES = [1, 2]        # 扰动能群：1(快群) 或 2(热群)
 TEMPLATE_FILE = "data-gen/2D_TWIGL/twigl_diff_ramp_quarter.prm" # 模板文件路径
 PRM_OUTPUT_DIR = "data-gen/prm_cases"                           # 生成的 PRM 文件存放目录
 RAW_DATA_BASE_DIR = "data-raw/2D_TWIGL_diff"                    # FEMFFUSION 运行结果存放总目录
-METADATA_FILE = "data-gen/dataset_parameters.csv"               # 记录生成参数的记录文件 (用于后期训练)
+METADATA_FILE = "dataset_parameters.csv"               # 记录生成参数的记录文件 (用于后期训练)
 # =====================================================================
 
 def generate_prm_dataset():
@@ -63,7 +63,7 @@ def generate_prm_dataset():
             group_change = np.random.choice(GROUP_CHOICES) 
             slope = slopes[i]
             cut_time = cut_times[i]
-            case_id = f"case_{i:03d}"
+            case_id = f"case_{i:04d}"
             
             # 2. 为当前算例创建专属的 FEMFFUSION 输出文件夹
             case_out_dir = os.path.join(RAW_DATA_BASE_DIR, case_id)
