@@ -12,7 +12,7 @@ uv.lock
 /notes
 backup/dataset_raw/outputs/
 /data-check-plots/*
-
+/data-processed/power_series_log/*
 __pycache__/
 *.py[cod]
 *$py.class

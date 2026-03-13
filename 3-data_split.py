@@ -10,10 +10,6 @@ def split_reactor_dataset_by_product(file_path, random_seed=42):
     print(f"正在读取原始数据文件: {file_path} ...")
     df = pd.read_csv(file_path)
     
-    # ==========================================
-    # 1. 计算总扰动量并提取外推测试集
-    # ==========================================
-    # 计算斜率与时间的乘积，代表物理上的“总扰动量”
     df['Perturbation_Total'] = df['slope_up'] * df['cut_time']
     
     # 按照总扰动量排序
