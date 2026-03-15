@@ -10,40 +10,59 @@ import numpy as np
 TRAIN_CSV = 'data-split/dataset_train_processed.csv'
 VAL_CSV = 'data-split/dataset_val_processed.csv'
 NPY_DIR = 'data-processed/power_series_log/'
-TEST_CSV = 'data-split/dataset_test_extrapolation_processed.csv' # 新增外推集路径
-
+TEST_CSV = 'data-split/dataset_test_extrapolation_processed.csv'
+RAW_CSV = 'dataset_parameters_cleaned.csv'
 # ==========================================
 # 1. 数据装载器 (Custom Dataset)
 # ==========================================
 class TWIGLDataset(Dataset):
-    def __init__(self, csv_file, npy_dir, seq_len=101):
+    def __init__(self,processed_csv, raw_csv, npy_dir, seq_len=101):
         """
         csv_file: 经过特征工程处理后的参数表 (如 dataset_train_processed.csv)
         npy_dir: 存放对数功率序列的文件夹
         seq_len: 时间步长度 (默认 101 步)
         """
-        self.df = pd.read_csv(csv_file)
+        self.df_proc = pd.read_csv(processed_csv)
         self.npy_dir = npy_dir
         self.seq_len = seq_len
         
         # 提取 case_id 用于寻找对应的 .npy 文件
-        self.case_ids = self.df['case_id'].astype(str).str.replace('case_', '').astype(int).values        
-        # 提取所有的输入特征 (剔除 case_id 列)
-        feature_cols = [col for col in self.df.columns if col != 'case_id']
-        self.features = self.df[feature_cols].values # shape: (num_samples, num_features)
+        self.case_ids = self.df_proc['case_id'].astype(str).str.replace('case_', '').astype(int).values        
+        feature_cols = [col for col in self.df_proc.columns if col != 'case_id']
+        self.features = self.df_proc[feature_cols].values # shape: (num_samples, num_features)
         
+        df_raw=pd.read_csv(raw_csv)
+        df_raw['case_id_clean']=df_raw['case_id'].astype(str).str.replace('case_','').astype(int)
+        self.df_raw = df_raw.set_index('case_id_clean')
+
+
         # 预先生成归一化后的时间步向量 [0, 1]，shape: (seq_len, 1)
-        self.t_steps = np.linspace(0, 1, self.seq_len).reshape(-1, 1)
+        self.t_steps_norm = np.linspace(0, 1, self.seq_len).reshape(-1, 1) # 归一化时间 [0, 1]
+        self.t_phys = np.linspace(0, 0.5, self.seq_len) # TWIGL 真实的物理时间轴 [0, 0.5s]
 
     def __len__(self):
-        return len(self.df)
+        return len(self.df_proc)
 
     def __getitem__(self, idx):
+        case_id = self.case_ids[idx]
+
         # 1. 获取静态物理特征
         static_params = self.features[idx]
-        
+        static_params_seq = np.tile(static_params, (self.seq_len, 1))
+
+        raw_slope = self.df_raw.loc[case_id, 'slope_up']
+        raw_cut = self.df_raw.loc[case_id, 'cut_time']
+
+        dynamic_reactivity = np.zeros((self.seq_len, 1))
+        for i, t in enumerate(self.t_phys):
+            if t <= raw_cut:
+                dynamic_reactivity[i, 0] = raw_slope * t
+            else:
+                dynamic_reactivity[i, 0] = raw_slope * raw_cut
+
         # 2. 读取对应的目标序列 (真实 ln(P))
         case_id = self.case_ids[idx]
+
         npy_path = os.path.join(self.npy_dir, f"power_{case_id:04d}.npy")
         true_log_power = np.load(npy_path) # shape: (seq_len, 1)
         
@@ -51,7 +70,7 @@ class TWIGLDataset(Dataset):
         # 复制静态参数 seq_len 次: shape (seq_len, num_features)
         static_params_seq = np.tile(static_params, (self.seq_len, 1))
         # 拼上时间步: shape (seq_len, num_features + 1)
-        x_seq = np.hstack([static_params_seq, self.t_steps])
+        x_seq = np.hstack([static_params_seq, self.t_steps_norm,dynamic_reactivity])
         
         # 转为 PyTorch 张量
         x_tensor = torch.tensor(x_seq, dtype=torch.float32)
@@ -111,9 +130,9 @@ def train_model():
     print(f"🔥 正在使用设备: {device}")
 
     # --- 准备数据加载器 ---
-    train_dataset = TWIGLDataset(TRAIN_CSV, NPY_DIR)
-    val_dataset = TWIGLDataset(VAL_CSV, NPY_DIR)
-    test_dataset = TWIGLDataset(TEST_CSV, NPY_DIR) # 新增外推集
+    train_dataset = TWIGLDataset(TRAIN_CSV, RAW_CSV,NPY_DIR)
+    val_dataset = TWIGLDataset(VAL_CSV,RAW_CSV, NPY_DIR)
+    test_dataset = TWIGLDataset(TEST_CSV, RAW_CSV,NPY_DIR) # 新增外推集
     
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
