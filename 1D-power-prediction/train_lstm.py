@@ -7,10 +7,10 @@ import pandas as pd
 import numpy as np
 
 # 路径定义
-TRAIN_CSV = 'data-split/dataset_train_processed.csv'
-VAL_CSV = 'data-split/dataset_val_processed.csv'
+TRAIN_CSV = '1D-power-prediction/dataset_train_processed.csv'
+VAL_CSV = '1D-power-prediction/dataset_val_processed.csv'
 NPY_DIR = 'data-processed/power_series_log/'
-TEST_CSV = 'data-split/dataset_test_extrapolation_processed.csv'
+TEST_CSV = '1D-power-prediction/dataset_test_extrapolation_processed.csv'
 RAW_CSV = 'dataset_parameters_cleaned.csv'
 # ==========================================
 # 1. 数据装载器 (Custom Dataset)

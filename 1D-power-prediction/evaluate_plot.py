@@ -9,8 +9,8 @@ import random
 # ==========================================
 # 全局路径配置 (常量大写)
 # ==========================================
-VAL_CSV = 'data-split/dataset_val_processed.csv'
-EXTRAPOL_CSV = 'data-split/dataset_test_extrapolation_processed.csv'
+VAL_CSV = '1D-power-prediction/dataset_val_processed.csv'
+EXTRAPOL_CSV = '1D-power-prediction/dataset_test_extrapolation_processed.csv'
 RAW_CSV = 'dataset_parameters_cleaned.csv' 
 NPY_DIR = 'data-processed/power_series_log/'
 MODEL_PATH = 'models/best_lstm_model.pth' 
