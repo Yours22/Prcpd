@@ -1,0 +1,34 @@
+# 路径配置
+paths:
+  raw_data_dir: "data-raw/2D_TWIGL_diff"
+  split_data_dir: "data-split"
+  processed_dir: "2D-PINN/data-processed"
+  pod_save_dir: "2D-PINN/pod_models"
+  model_save_dir: "2D-PINN/models"
+  output_dir: "2D-PINN/results"
+
+# 物理与数据维度配置
+physics:
+  num_time_steps: 101          # 包含 t=0 的初始稳态
+  total_time: 0.5
+  num_nodes_per_group: 400     # 快/热群各自的节点数
+  total_nodes: 800
+  dt: 0.005                     # 0.5 / 100
+  decay_constants: [0.1, 1.0, 10.0] 
+
+# POD 降维配置
+pod:
+  r_fast: 8
+  r_thermal: 8
+
+# 神经网络训练配置
+training:
+  # 现在的输入特征维度 = 4 (原始) + 3 (衰减积分) = 7
+  input_dim: 8
+  batch_size: 128
+  epochs: 500
+  learning_rate: 0.003
+  patience: 60                 # 早停容忍度
+  lambda_td: 0.5               # 时间导数物理约束权重
+  hidden_dim: 256
+  num_layers: 3

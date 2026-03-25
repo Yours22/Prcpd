@@ -1,4 +1,5 @@
 /FEMFFUSION
+*.npy
 /data-raw/*
 /data-gen/*.npy
 /data-gen/prm_cases/*
@@ -17,3 +18,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 prm_cases/*
+2D-PINN/data-processed/*
