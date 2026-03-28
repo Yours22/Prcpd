@@ -19,25 +19,42 @@ os.makedirs(PATHS['model_save_dir'], exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ================= 核心重构：物理空间绝对误差损失 =================
-class PhysicalSpaceLoss(nn.Module):
-    def __init__(self, a_mean, a_std, device):
-        super(PhysicalSpaceLoss, self).__init__()
-        # 提取统计参数用于微分逆还原
+class HybridModalLoss(nn.Module):
+    def __init__(self, a_mean, a_std, device, lambda_higher=100.0):
+        super(HybridModalLoss, self).__init__()
         self.a_mean = a_mean.view(1, 1, -1).to(device)
         self.a_std = a_std.view(1, 1, -1).to(device)
+        self.l1 = nn.L1Loss(reduction='none')
+        # 用于平衡绝对误差(百量级)与归一化误差(零点几量级)的缩放因子
+        self.lambda_higher = lambda_higher 
 
     def forward(self, pred_scaled, true_scaled):
-        # 1. 逆标准化 (保持张量的计算图和梯度)
+        # 1. 还原至绝对物理空间
         pred_symlog = pred_scaled * self.a_std + self.a_mean
         true_symlog = true_scaled * self.a_std + self.a_mean
 
-        # 2. 逆 SymLog 还原到绝对物理空间
         pred_phys = torch.sign(pred_symlog) * torch.expm1(torch.abs(pred_symlog))
         true_phys = torch.sign(true_symlog) * torch.expm1(torch.abs(true_symlog))
 
-        # 3. 在真实物理尺度上计算 L1 损失 (MAE)
-        # 物理空间的误差极大 (如几万)，使用 L1 Loss 可以提供稳定的线性梯度，防止 MSE 的平方效应导致梯度爆炸
-        return torch.nn.functional.l1_loss(pred_phys, true_phys)
+        # 2. 计算基础 L1 绝对误差矩阵 (Batch, 101, 16)
+        abs_err = self.l1(pred_phys, true_phys)
+        
+        # 3. 分支 A：Mode 1 采用纯绝对误差，死保全局能量基准
+        loss_m1 = abs_err[:, :, 0].mean()
+        
+        # 4. 分支 B：Mode 2~16 采用归一化误差，提升高频空间形变精度
+        # 提取高阶模态并计算标准差进行归一化 (+1.0 防止除零)
+        higher_true_phys = true_phys[:, :, 1:]
+        higher_abs_err = abs_err[:, :, 1:]
+        
+        mode_scale = torch.std(higher_true_phys, dim=(0, 1), keepdim=True).detach() + 1.0
+        normalized_higher_err = higher_abs_err / mode_scale
+        
+        loss_higher = normalized_higher_err.mean()
+        
+        # 5. 组合总损失
+        return loss_m1 + self.lambda_higher * loss_higher
+    
 
 def main():
     train_ds = TransientSequenceDataset(
@@ -60,8 +77,7 @@ def main():
     # 实例化物理空间损失函数
     a_mean_tensor = train_ds.A_mean.clone().detach()
     a_std_tensor = train_ds.A_std.clone().detach()
-    criterion = PhysicalSpaceLoss(a_mean_tensor, a_std_tensor, device)
-    
+    criterion = HybridModalLoss(a_mean_tensor, a_std_tensor, device)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=15)
 
     best_val_loss = float('inf')

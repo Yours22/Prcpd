@@ -29,10 +29,27 @@ def extract_time_vector(out_file_path):
 
 def extract_flux(vtk_file_path):
     mesh = pv.read(vtk_file_path)
-    fast_flux = mesh.point_data['Fast_Flux'].copy()
-    thermal_flux = mesh.point_data['Thermal_Flux'].copy()
+    
+    # 1. 提取真实的物理几何坐标
+    x = mesh.points[:, 0]
+    y = mesh.points[:, 1]
+    
+    # 2. 生成基于坐标的绝对排序索引
+    # 使用 np.round 消除有限元网格可能的浮点数精度误差
+    # np.lexsort 接收的键是逆序的：传入 (x, y) 代表优先按 y 排序，再按 x 排序
+    # 这将生成标准的行优先（从下到上，从左到右）的一维索引
+    sort_idx = np.lexsort((np.round(x, 5), np.round(y, 5)))
+    
+    # 3. 提取通量数据
+    fast_flux_raw = mesh.point_data['Fast_Flux'].copy()
+    thermal_flux_raw = mesh.point_data['Thermal_Flux'].copy()
     mesh.clear_data() # 防止 PyVista 内存泄漏
-    return np.hstack((fast_flux, thermal_flux))
+    
+    # 4. 应用排序索引，纠正拓扑顺序
+    fast_flux_sorted = fast_flux_raw[sort_idx]
+    thermal_flux_sorted = thermal_flux_raw[sort_idx]
+    
+    return np.hstack((fast_flux_sorted, thermal_flux_sorted))
 
 def process_and_save(csv_file, prefix):
     csv_path = os.path.join(PATHS['split_data_dir'], csv_file)

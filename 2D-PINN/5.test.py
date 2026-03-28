@@ -84,7 +84,7 @@ def main():
     # ================= 4. 初始化模型并推理 =================
     output_dim = POD['r_fast'] + POD['r_thermal']
     # 强制 input_dim=8 以匹配增强后的特征
-    model = POD_LSTM(8, TRAIN['hidden_dim'], output_dim, TRAIN.get('num_layers', 2)).to(device)
+    model = POD_LSTM(TRAIN['input_dim'], TRAIN['hidden_dim'], output_dim, TRAIN.get('num_layers', 2)).to(device)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
     

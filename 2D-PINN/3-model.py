@@ -64,20 +64,31 @@ class POD_LSTM(nn.Module):
         super(POD_LSTM, self).__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         
-        # 【核心改动】：全连接层的输入维度 = LSTM 隐藏层 + 原始 8 维特征
-        self.fc = nn.Sequential(
+        # 通道 A：专职负责模态 1 (指数级全局演化)
+        self.fc_mode1 = nn.Sequential(
+            nn.Linear(hidden_dim + input_dim, hidden_dim // 2),
+            nn.SiLU(),
+            nn.Linear(hidden_dim // 2, 1)
+        )
+        
+        # 通道 B：专职负责高阶模态 2~16 (局部空间形变与高频振荡)
+        self.fc_higher_modes = nn.Sequential(
             nn.Linear(hidden_dim + input_dim, hidden_dim),
             nn.SiLU(),
-            nn.Dropout(0.1), # 加入微量随机失活增强泛化
-            nn.Linear(hidden_dim, output_dim)
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim, output_dim - 1)
         )
 
     def forward(self, x):
         # x shape: (Batch, 101, 8)
-        lstm_out, _ = self.lstm(x) # (Batch, 101, hidden_dim)
+        lstm_out, _ = self.lstm(x) 
         
-        # 将 LSTM 的输出与原始输入特征在特征维度（dim=2）上拼接
-        # 这就是“物理直连”，防止后期失忆
+        # 物理特征直连
         combined = torch.cat([lstm_out, x], dim=2) 
         
-        return self.fc(combined)
+        # 分支预测
+        pred_m1 = self.fc_mode1(combined)                 # shape: (Batch, 101, 1)
+        pred_higher = self.fc_higher_modes(combined)      # shape: (Batch, 101, 15)
+        
+        # 拼接回完整的 16 维输出
+        return torch.cat([pred_m1, pred_higher], dim=2)
