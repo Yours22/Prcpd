@@ -29,27 +29,28 @@ def extract_time_vector(out_file_path):
 
 def extract_flux(vtk_file_path):
     mesh = pv.read(vtk_file_path)
-    
-    # 1. 提取真实的物理几何坐标
-    x = mesh.points[:, 0]
-    y = mesh.points[:, 1]
-    
-    # 2. 生成基于坐标的绝对排序索引
-    # 使用 np.round 消除有限元网格可能的浮点数精度误差
-    # np.lexsort 接收的键是逆序的：传入 (x, y) 代表优先按 y 排序，再按 x 排序
-    # 这将生成标准的行优先（从下到上，从左到右）的一维索引
-    sort_idx = np.lexsort((np.round(x, 5), np.round(y, 5)))
-    
-    # 3. 提取通量数据
     fast_flux_raw = mesh.point_data['Fast_Flux'].copy()
     thermal_flux_raw = mesh.point_data['Thermal_Flux'].copy()
     mesh.clear_data() # 防止 PyVista 内存泄漏
     
-    # 4. 应用排序索引，纠正拓扑顺序
-    fast_flux_sorted = fast_flux_raw[sort_idx]
-    thermal_flux_sorted = thermal_flux_raw[sort_idx]
+    def reorder_to_image(raw_data):
+        n_blocks_y, n_blocks_x = 10, 10
+        block_size = 2  # 2x2 = 4 个节点/组件
+        
+        # 1. 恢复有限元组件结构 (10, 10, 2, 2)
+        reshaped = raw_data.reshape(n_blocks_y, n_blocks_x, block_size, block_size)
+        
+        # 2. 张量轴交换：将组件行与节点行合并，组件列与节点列合并
+        # (BlockRow, BlockCol, InnerRow, InnerCol) -> (BlockRow, InnerRow, BlockCol, InnerCol)
+        transposed = reshaped.transpose(0, 2, 1, 3)
+        
+        # 3. 展平为连续的一维向量，完美对应 20x20 的行优先图像
+        return transposed.reshape(-1)
+
+    fast_flux = reorder_to_image(fast_flux_raw)
+    thermal_flux = reorder_to_image(thermal_flux_raw)
     
-    return np.hstack((fast_flux_sorted, thermal_flux_sorted))
+    return np.hstack((fast_flux, thermal_flux))
 
 def process_and_save(csv_file, prefix):
     csv_path = os.path.join(PATHS['split_data_dir'], csv_file)

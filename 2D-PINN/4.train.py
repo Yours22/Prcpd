@@ -18,7 +18,6 @@ PATHS, TRAIN, POD = config['paths'], config['training'], config['pod']
 os.makedirs(PATHS['model_save_dir'], exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ================= 核心重构：物理空间绝对误差损失 =================
 class HybridModalLoss(nn.Module):
     def __init__(self, a_mean, a_std, device, lambda_higher=100.0):
         super(HybridModalLoss, self).__init__()

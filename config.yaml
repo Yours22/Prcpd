@@ -31,4 +31,4 @@ training:
   patience: 60                 # 早停容忍度
   lambda_td: 0.5               # 时间导数物理约束权重
   hidden_dim: 256
-  num_layers: 3
+  num_layers: 4
