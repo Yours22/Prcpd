@@ -41,7 +41,6 @@ def extract_flux(vtk_file_path):
         reshaped = raw_data.reshape(n_blocks_y, n_blocks_x, block_size, block_size)
         
         # 2. 张量轴交换：将组件行与节点行合并，组件列与节点列合并
-        # (BlockRow, BlockCol, InnerRow, InnerCol) -> (BlockRow, InnerRow, BlockCol, InnerCol)
         transposed = reshaped.transpose(0, 2, 1, 3)
         
         # 3. 展平为连续的一维向量，完美对应 20x20 的行优先图像
@@ -59,8 +58,9 @@ def process_and_save(csv_file, prefix):
     df = pd.read_csv(csv_path)
     num_cases = len(df)
     
-    # 【内存优化】: 预分配全零 NumPy 数组，避免动态 append
-    X_matrix = np.zeros((num_cases, PHYSICS['num_time_steps'], 4), dtype=np.float32)
+    # 【核心重构：将基础特征从 4 维扩展至 6 维】
+    # 特征顺序: [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
+    X_matrix = np.zeros((num_cases, PHYSICS['num_time_steps'], 6), dtype=np.float32)
     Y_matrix = np.zeros((num_cases, PHYSICS['num_time_steps'], PHYSICS['total_nodes']), dtype=np.float32)
     
     valid_indices = []
@@ -69,10 +69,18 @@ def process_and_save(csv_file, prefix):
         raw_case_id = str(row['case_id'])
         case_id = raw_case_id if raw_case_id.startswith('case_') else f"case_{int(float(raw_case_id)):04d}"
         
-        mat_changing = row['material_changing']
-        grp_changing = row['group_changing']
-        slope_up = row['slope_up']
-        cut_time = row['cut_time']
+        # 1. 解析分类变量并进行物理独热编码 (One-Hot)
+        # 彻底废除 1.0/2.0 的标量大小压制，改为平等的空间开关
+        mat_changing = int(row['material_changing'])
+        grp_changing = int(row['group_changing'])
+        
+        is_reg1 = 1.0 if mat_changing == 1 else 0.0
+        is_reg2 = 1.0 if mat_changing == 2 else 0.0
+        is_fast = 1.0 if grp_changing == 1 else 0.0
+        is_thermal = 1.0 if grp_changing == 2 else 0.0
+        
+        slope_up = float(row['slope_up'])
+        cut_time = float(row['cut_time'])
         
         case_dir = os.path.join(PATHS['raw_data_dir'], case_id)
         out_file = os.path.join(case_dir, f"{case_id}.out")
@@ -88,8 +96,11 @@ def process_and_save(csv_file, prefix):
                 is_valid = False
                 break
                 
+            # 2. 计算连续的物理驱动力 (微扰幅值)
             p_t = slope_up * t if t <= cut_time else slope_up * cut_time
-            X_matrix[i, k, :] = [mat_changing, grp_changing, p_t, t]
+            
+            # 3. 组装全新的无歧义特征向量
+            X_matrix[i, k, :] = [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
             Y_matrix[i, k, :] = extract_flux(vtk_file)
             
         if is_valid: valid_indices.append(i)
@@ -99,7 +110,7 @@ def process_and_save(csv_file, prefix):
     
     np.save(os.path.join(PATHS['processed_dir'], f"X_{prefix}.npy"), X_matrix)
     np.save(os.path.join(PATHS['processed_dir'], f"Y_{prefix}_raw.npy"), Y_matrix)
-    print(f"{prefix} 集处理完成: X形状 {X_matrix.shape}, Y形状 {Y_matrix.shape}")
+    print(f"{prefix} 集处理完成: 全新特征 X 形状 {X_matrix.shape}, 物理场 Y 形状 {Y_matrix.shape}")
 
 if __name__ == "__main__":
     process_and_save('dataset_train.csv', 'train')

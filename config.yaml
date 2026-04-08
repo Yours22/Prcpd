@@ -18,17 +18,16 @@ physics:
 
 # POD 降维配置
 pod:
-  r_fast: 8
-  r_thermal: 8
+  r_fast: 4
+  r_thermal: 4
 
 # 神经网络训练配置
 training:
-  # 现在的输入特征维度 = 4 (原始) + 3 (衰减积分) = 7
-  input_dim: 8
+  input_dim: 10
   batch_size: 128
-  epochs: 500
-  learning_rate: 0.003
-  patience: 60                 # 早停容忍度
+  epochs: 800
+  learning_rate: 0.001
+  patience: 80                 # 早停容忍度
   lambda_td: 0.5               # 时间导数物理约束权重
   hidden_dim: 256
-  num_layers: 4
+  num_layers: 2

@@ -3,7 +3,6 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import numpy as np
 
-# ================= 1. 数据集定义 (保留 7维特征 + SymLog) =================
 class TransientSequenceDataset(Dataset):
     def __init__(self, X_npy_path, A_npy_path, X_stats=None, A_stats=None, decay_lambdas=[0.1, 1.0, 10.0], dt=0.005):
         raw_X = np.load(X_npy_path)
@@ -59,36 +58,46 @@ class TransientSequenceDataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.A[idx]
 
+
 class POD_LSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers=2):
         super(POD_LSTM, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         
-        # 通道 A：专职负责模态 1 (指数级全局演化)
-        self.fc_mode1 = nn.Sequential(
-            nn.Linear(hidden_dim + input_dim, hidden_dim // 2),
+        self.lstm_macro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.lstm_micro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+        
+        # 宏观通道 FC：注意，这里预测的不再是绝对幅值，而是相邻时间步的【增量 Delta】
+        self.fc_mode1_delta = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
             nn.SiLU(),
             nn.Linear(hidden_dim // 2, 1)
         )
         
-        # 通道 B：专职负责高阶模态 2~16 (局部空间形变与高频振荡)
+        # 微观通道 FC：依然预测平缓的形状比值 R
         self.fc_higher_modes = nn.Sequential(
-            nn.Linear(hidden_dim + input_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.SiLU(),
             nn.Dropout(0.1),
             nn.Linear(hidden_dim, output_dim - 1)
         )
 
     def forward(self, x):
-        # x shape: (Batch, 101, 8)
-        lstm_out, _ = self.lstm(x) 
+        # ================= 宏观干道：导数预测与内部积分 =================
+        lstm_out_macro, _ = self.lstm_macro(x) 
         
-        # 物理特征直连
-        combined = torch.cat([lstm_out, x], dim=2) 
+        # 1. 网络输出每个时间步的增量 (Derivative / Growth Rate)
+        # 在瞬态后期，这个 delta 会聪明地收敛为一个常数
+        delta_m1 = self.fc_mode1_delta(lstm_out_macro)
         
-        # 分支预测
-        pred_m1 = self.fc_mode1(combined)                 # shape: (Batch, 101, 1)
-        pred_higher = self.fc_higher_modes(combined)      # shape: (Batch, 101, 15)
+        # 2. 物理积分层 (Neural Integration)
+        # 沿着时间维度 (dim=1) 进行累加：y_t = y_0 + sum(delta_1 ... delta_t)
+        # 这一步瞬间将常数/有界的输出，转化为了可以无限突破天际的指数爆炸曲线！
+        pred_m1_scaled = torch.cumsum(delta_m1, dim=1)
+        # ================================================================
+
+        # ================= 微观干道：维持比值预测 =================
+        lstm_out_micro, _ = self.lstm_micro(x) 
+        pred_R = self.fc_higher_modes(lstm_out_micro)  
+        # ==========================================================
         
-        # 拼接回完整的 16 维输出
-        return torch.cat([pred_m1, pred_higher], dim=2)
+        return torch.cat([pred_m1_scaled, pred_R], dim=2)
