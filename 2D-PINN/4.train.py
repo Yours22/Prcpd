@@ -32,42 +32,38 @@ class DualStageRatioLoss(nn.Module):
         self.a_std = a_std.view(1, 1, -1).to(device)
         self.l1_loss = nn.L1Loss(reduction='none')
         
-        # ================= 核心革新 1：指数级时间加权 =================
-        # 放弃线性增长，使用指数增长。让第 80~100 步的惩罚力度呈现爆炸式上升
+        # 1. 保留指数级时间加权，按住末端的爆炸尾巴
         exponent = torch.linspace(0, np.log(end_weight), steps=seq_len).view(1, -1, 1).to(device)
         weights = torch.exp(exponent)
+        
+        # ================= 终极补丁：浴缸加权 (锚定初始条件) =================
+        # 强行给前 5 个时间步施加与末端同等（甚至更高）的极限权重！
+        # 这将逼迫网络绝对不准在起点乱跳，必须从物理原点老老实实出发。
+        weights[:, 0:5, :] = end_weight * 1.5  
+        # ====================================================================
+        
         self.time_weights = weights / weights.mean()
 
     def forward(self, pred_out, true_scaled, stage):
-        
+        # ... (这里的 forward 代码完全保持上一次的逻辑，无需改动) ...
         if stage == 1:
             pred_m1_scaled = pred_out[:, :, 0:1]
             true_m1_scaled = true_scaled[:, :, 0:1]
-            
-            # ================= 核心革新 2：幅度感知加权 =================
-            # 真实缩放值越大的地方（即物理爆发期），要求对数空间的拟合越严苛
-            # 加 1.0 是为了防止在数值为 0 的地方失去基础梯度
             mag_weights = torch.abs(true_m1_scaled) + 1.0
-            
             base_loss = self.l1_loss(pred_m1_scaled, true_m1_scaled)
-            
-            # 三管齐下：基础误差 * 时间权重 * 幅度权重
             weighted_loss = base_loss * self.time_weights * mag_weights
             return weighted_loss.mean()
             
         elif stage == 2:
             true_symlog = true_scaled * self.a_std + self.a_mean
             true_phys = torch.sign(true_symlog) * torch.expm1(torch.abs(true_symlog))
-            
             pred_R = pred_out[:, :, 1:]
             true_R = true_phys[:, :, 1:] / (torch.abs(true_phys[:, :, 0:1]) + 1.0).detach()
-            
-            # ================= 核心革新 3：L1 梯度唤醒 =================
-            # 彻底抛弃 MSE！放大 1000 倍并使用 L1，保证在误差极小时依然有锋利的梯度去逼近常数水平线
+            # 依然使用 L1 保证收敛的锋利度
             base_loss_higher = self.l1_loss(pred_R * 1000.0, true_R * 1000.0)
             weighted_loss_higher = base_loss_higher * self.time_weights
             return weighted_loss_higher.mean()
-
+        
 def main():
     train_ds = TransientSequenceDataset(
         os.path.join(PATHS['processed_dir'], "X_train.npy"),

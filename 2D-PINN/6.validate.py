@@ -17,6 +17,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 os.makedirs(PATHS['output_dir'], exist_ok=True)
 
 def restore_and_visualize():
+    case_idx = 20
+    time_steps = [0, 40, 80, 99] 
+    
     print("========== 开始执行物理场还原与可视化流程 ==========")
     
     try:
@@ -91,8 +94,7 @@ def restore_and_visualize():
     except FileNotFoundError:
         Y_test_raw = None
 
-    case_idx = 0
-    time_steps = [0, 40, 80, 99] 
+    
     
     for group in ["thermal", "fast"]:
         if group == "fast":

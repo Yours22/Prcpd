@@ -13,6 +13,7 @@ TransientSequenceDataset = model_module.TransientSequenceDataset
 
 def main():
     print(">>> 开始生成总功率演化对比图...")
+    case_idx = 20
 
     # 1. 加载配置
     with open("config.yaml", "r", encoding="utf-8") as f:
@@ -58,7 +59,7 @@ def main():
     model.eval()
 
     # 6. 选择一个测试样本 (例如测试集中的第 0 个 Case)
-    case_idx = 40
+    
     X_input = test_ds.X[case_idx].unsqueeze(0).to(device) # Shape: (1, 101, 8)
     
     # 获取对应 Case 的真实物理场
