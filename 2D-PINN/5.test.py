@@ -48,7 +48,7 @@ def plot_trajectories(A_true, A_pred, case_idx=0, log_file=None):
 
 def main():
     # 打开日志文件
-    log_dir = os.path.join("2D-PINN", "log")
+    log_dir = PATHS['log_dir']
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = os.path.join(log_dir, f"test_log_{timestamp}.txt")
@@ -146,6 +146,42 @@ def main():
         pred_mode = A_pred[:, :, i]
         mode_rel_err = np.linalg.norm(pred_mode - true_mode) / (np.linalg.norm(true_mode) + 1e-10)
         log_print(log_file, f"-> Mode {i+1} 相对误差 = {mode_rel_err*100:.4f}%")
+
+    # ================= 按物理参数分类评估 =================
+    # 从独热编码推断类别（取第一时间步，类别不随时间变化）
+    is_reg1  = X_test_raw[:, 0, 0]   # material_changing = 1 (核心区)
+    is_fast  = X_test_raw[:, 0, 2]   # group_changing = 1 (快群)
+
+    region = np.where(is_reg1 == 1, "Core", "Rod")
+    group  = np.where(is_fast == 1, "Fast", "Thermal")
+
+    categories = {}
+    for r in ["Core", "Rod"]:
+        for g in ["Fast", "Thermal"]:
+            name = f"{r} + {g}"
+            mask = (region == r) & (group == g)
+            categories[name] = mask
+
+    log_print(log_file, f"\n========== 按物理参数分类评估 ==========")
+    log_print(log_file, f"{'类别':<20} {'样本数':>6} {'平均RelErr':>10} {'前期':>8} {'中期':>8} {'后期':>8}")
+    log_print(log_file, f"{'-'*60}")
+
+    for name, mask in categories.items():
+        idx = np.where(mask)[0]
+        if len(idx) == 0:
+            continue
+
+        group_rel = rel_error_per_sample[idx]
+        norm_diff_g = np.linalg.norm(Y_pred[idx] - Y_test_raw[idx], axis=(0, 2))
+        norm_true_g = np.linalg.norm(Y_test_raw[idx], axis=(0, 2))
+        rel_err_g = norm_diff_g / (norm_true_g + 1e-10)
+
+        log_print(log_file,
+            f"{name:<20} {len(idx):>6} "
+            f"{np.mean(group_rel)*100:>9.2f}% "
+            f"{np.mean(rel_err_g[:30])*100:>7.2f}% "
+            f"{np.mean(rel_err_g[30:70])*100:>7.2f}% "
+            f"{np.mean(rel_err_g[70:])*100:>7.2f}%")
 
     np.save(os.path.join(PATHS['output_dir'], "Y_test_pred.npy"), Y_pred)
     np.save(os.path.join(PATHS['output_dir'], "A_test_pred.npy"), A_pred)

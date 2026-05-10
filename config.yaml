@@ -7,6 +7,7 @@ paths:
   pod_save_dir: "2D-PINN/pod_models"
   model_save_dir: "2D-PINN/models"
   output_dir: "2D-PINN/results"
+  log_dir: "2D-PINN/log"
 
 # 物理与数据维度配置
 physics:
@@ -32,3 +33,15 @@ training:
   lambda_td: 0.5               # 时间导数物理约束权重
   hidden_dim: 256
   num_layers: 2
+  # 阶段划分
+  stage1_ratio: 0.3
+  stage2_ratio: 0.85
+  # 损失函数
+  end_weight: 50.0
+  ratio_loss_scale: 1000.0
+  # 优化器与调度器
+  weight_decay: 0.0001
+  residual_lr: 0.0001
+  scheduler_patience: 10
+  scheduler_factor: 0.5
+  grad_clip_norm: 1.0

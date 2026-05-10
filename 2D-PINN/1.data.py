@@ -90,7 +90,7 @@ def process_and_save(csv_file, prefix):
         grp_changing = int(row['group_changing'])
         
         is_reg1 = 1.0 if mat_changing == 1 else 0.0
-        is_reg2 = 1.0 if mat_changing == 2 else 0.0
+        is_reg2 = 1.0 if mat_changing == 3 else 0.0
         is_fast = 1.0 if grp_changing == 1 else 0.0
         is_thermal = 1.0 if grp_changing == 2 else 0.0
         

@@ -3,35 +3,40 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 import numpy as np
 
+# 输入特征列索引 (由 1.data.py 定义)
+# [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
+P_T_IDX = 4
+
+def symlog_inverse(x):
+    """SymLog 逆变换: sign(x) * expm1(|x|) — 用于从 SymLog 空间还原物理值"""
+    return torch.sign(x) * torch.expm1(torch.abs(x))
+
+
 class TransientSequenceDataset(Dataset):
     def __init__(self, X_npy_path, A_npy_path, X_stats=None, A_stats=None, decay_lambdas=[0.1, 1.0, 10.0], dt=0.005):
         raw_X = np.load(X_npy_path)
         self.A = torch.tensor(np.load(A_npy_path), dtype=torch.float32)
         
         num_cases, num_steps, _ = raw_X.shape
-        p_t = raw_X[:, :, 2]
-        
-        # 指数衰减积分 (物理记忆)
+        p_t = raw_X[:, :, P_T_IDX]
+
+        # 指数衰减积分 (模拟不同时间尺度的先驱核记忆效应)
         decay_features = []
-        # ... 前面提取 p_t 和计算 decay_features 的代码保持不变 ...
         for lam in decay_lambdas:
             integral = np.zeros((num_cases, num_steps))
             for t in range(1, num_steps):
                 integral[:, t] = integral[:, t-1] * np.exp(-lam * dt) + p_t[:, t] * dt
             decay_features.append(integral[:, :, np.newaxis])
-            
-        # ================= 新增：加上简单累积积分特征 =================
-        # np.cumsum 计算累加，乘以 dt 就是物理意义上的简单积分
+
+        # 简单累积积分
         simple_integral = np.cumsum(p_t, axis=1) * dt
         decay_features.append(simple_integral[:, :, np.newaxis])
-        # ==============================================================
-        
-        # 拼接原始特征与所有积分特征 -> 此时变成了 8 维！
+
+        # 拼接原始特征与积分特征 → 10 维
         combined_X = np.concatenate([raw_X] + decay_features, axis=-1)
         self.X = torch.tensor(combined_X, dtype=torch.float32)
 
-        # ... 后面的 SymLog 转换和标准化代码完全保持不变 ...
-        # 【核心保留】：对 A 进行 SymLog 转换，防止网络饱和
+        # SymLog 变换压缩指数爆发的动态范围
         self.A = torch.sign(self.A) * torch.log1p(torch.abs(self.A))
 
         # 标准化 X

@@ -41,6 +41,7 @@
 ### 输入特征（10 维）
 ```
 原始 6 维: [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
+  其中 p_t 位于索引 4 (3-model.py 中定义为 P_T_IDX 常量)
 指数衰减积分 3 维: ∫ p_t(τ)·e^{-λ(t-τ)} dτ  (λ = 0.1, 1.0, 10.0)
 简单累积积分 1 维: ∫ p_t(τ) dτ
 ```
@@ -70,7 +71,7 @@ pred_higher_k(t) = R_k(t) × pred_m1(t)
 物理直觉：高阶模态的空间形状相对稳定（由反应堆几何决定），它们的绝对幅值天然跟随主振幅缩放。学习比值比学习绝对值更稳定。
 
 ### 数值技巧：SymLog 变换
-对 POD 系数做 `sign(x) × log(1 + |x|)` 变换后再输入网络。目的：压缩指数爆发的动态范围，防止 L1/L2 损失在末端几个数量级变化下饱和。
+对 POD 系数做 `sign(x) × log(1 + |x|)` 变换后再输入网络。目的：压缩指数爆发的动态范围，防止 L1/L2 损失在末端几个数量级变化下饱和。`symlog_inverse(x) = sign(x) × expm1(|x|)` 定义在 3-model.py 中供各模块复用，避免逻辑重复。
 
 ## 三阶段训练策略
 
@@ -79,13 +80,13 @@ pred_higher_k(t) = R_k(t) × pred_m1(t)
 | 阶段 | Epoch | 解冻模块 | 训练目标 | 损失函数 |
 |------|-------|---------|---------|---------|
 | S1 | 0-30% | lstm_macro + fc_mode1_delta | 宏观趋势积分器 | Mode 1 的幅值加权 L1 |
-| S2 | 30-85% | lstm_micro + fc_higher_modes | 高阶形状比值 | 比值 R_k × 1000 的 L1 |
-| S3 | 85-100% | fc_mode1_residual | 残差精修 | Mode 1 的幅值加权 L1（lr=1e-4） |
+| S2 | 30-85% | lstm_micro + fc_higher_modes | 高阶形状比值 | 比值 R_k × ratio_loss_scale 的 L1 |
+| S3 | 85-100% | fc_mode1_residual | 残差精修 | Mode 1 的幅值加权 L1（lr=residual_lr） |
 
-**损失函数细节**：
-- 时间加权：指数增长权重（末端 ×50），且前 5 步也保持 0.8×50（防止初期稳态被忽略）
+**损失函数细节**（`end_weight`、`ratio_loss_scale`、`residual_lr` 等均由 config.yaml 管理）：
+- 时间加权：指数增长权重（末端 ×`end_weight`），且前 5 步也保持 0.8×`end_weight`（防止初期稳态被忽略）
 - Stage 1/3：`L1(pred_m1, true_m1) × time_weight × (|true_m1| + 1.0)` — 幅值加权确保大信号不被小信号平均掩盖
-- Stage 2：比值乘以 1000 放大尺度，保证 L1 梯度足够锋利
+- Stage 2：比值乘以 `ratio_loss_scale` 放大尺度，保证 L1 梯度足够锋利
 
 ## 评估体系
 
@@ -97,7 +98,7 @@ pred_higher_k(t) = R_k(t) × pred_m1(t)
 
 ### 根目录 — 核心 ML 管道
 
-- config.yaml — 全局配置（路径、物理参数、POD 维度、训练超参数）
+- config.yaml — 全局配置（路径、物理参数、POD 维度、训练超参数、损失权重、优化器/调度器参数、阶段划分比例）
 - pyproject.toml — Python 项目依赖定义
 - notes/ — 论文初稿与修改笔记
 
@@ -109,8 +110,8 @@ pred_higher_k(t) = R_k(t) × pred_m1(t)
   - 7.pod-field.py — POD 空间模态可视化（平均场 + 各阶模态的空间形状）
 
 2. 模型与训练
-  - 3-model.py — 核心模型 POD-LSTM：双流 LSTM 架构，创新点在于振幅-形状分解——主模态（Mode 1）用"趋势积分 + 残差补偿"预测，高阶模态作为相对主模态的"形状比值"预测
-  - 4.train.py — 三阶段训练策略：Stage 1 训练宏观趋势积分器 → Stage 2 训练微观高阶模态 → Stage 3 精修残差分支。使用指数时间加权 + SymLog 数值变换
+  - 3-model.py — 核心模型 POD-LSTM：双流 LSTM 架构，创新点在于振幅-形状分解——主模态（Mode 1）用"趋势积分 + 残差补偿"预测，高阶模态作为相对主模态的"形状比值"预测。同时导出 `symlog_inverse()` 工具函数和 `P_T_IDX` 特征列索引常量，供其他模块复用
+  - 4.train.py — 三阶段训练策略：Stage 1 训练宏观趋势积分器 → Stage 2 训练微观高阶模态 → Stage 3 精修残差分支。使用指数时间加权 + SymLog 数值变换。阶段切换、训练步骤、模型保存均通过配置字典驱动，`_train_step()` 消除重复代码，超参数统一由 config.yaml 管理
 
 3. 评估与可视化
   - 5.test.py — 全流程推理评估，输出 POD 系数轨迹对比图；诊断日志保存至 `2D-PINN/log/test_log_<timestamp>.txt`

@@ -12,12 +12,14 @@ from importlib import import_module
 model_module = import_module("3-model")
 TransientSequenceDataset = model_module.TransientSequenceDataset
 POD_LSTM = model_module.POD_LSTM
+symlog_inverse = model_module.symlog_inverse
 
 with open("config.yaml", "r", encoding="utf-8") as f: 
     config = yaml.safe_load(f)
-PATHS, TRAIN, POD = config['paths'], config['training'], config['pod']
+PATHS, TRAIN, POD, PHYSICS = config['paths'], config['training'], config['pod'], config['physics']
 
 os.makedirs(PATHS['model_save_dir'], exist_ok=True)
+os.makedirs(PATHS['log_dir'], exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 冻结/解冻参数的辅助函数
@@ -26,41 +28,52 @@ def set_requires_grad(module, requires_grad):
         param.requires_grad = requires_grad
 
 class DualStageRatioLoss(nn.Module):
-    def __init__(self, a_mean, a_std, device, seq_len=101, end_weight=50.0):
+    def __init__(self, a_mean, a_std, device, seq_len=101, end_weight=50.0, ratio_scale=1000.0):
         super(DualStageRatioLoss, self).__init__()
         self.a_mean = a_mean.view(1, 1, -1).to(device)
         self.a_std = a_std.view(1, 1, -1).to(device)
         self.l1_loss = nn.L1Loss(reduction='none')
-        
+        self.ratio_scale = ratio_scale
+
         # 指数时间加权，按住末端的爆炸尾巴
         exponent = torch.linspace(0, np.log(end_weight), steps=seq_len).view(1, -1, 1).to(device)
         weights = torch.exp(exponent)
-        
         weights[:, 0:5, :] = end_weight * 0.8
-        
         self.time_weights = weights / weights.mean()
 
     def forward(self, pred_out, true_scaled, stage):
-        if stage == 1 or stage ==3:
+        if stage in (1, 3):
             pred_m1_scaled = pred_out[:, :, 0:1]
             true_m1_scaled = true_scaled[:, :, 0:1]
             mag_weights = torch.abs(true_m1_scaled) + 1.0
             base_loss = self.l1_loss(pred_m1_scaled, true_m1_scaled)
             weighted_loss = base_loss * self.time_weights * mag_weights
             return weighted_loss.mean()
-            
+
         elif stage == 2:
             true_symlog = true_scaled * self.a_std + self.a_mean
-            true_phys = torch.sign(true_symlog) * torch.expm1(torch.abs(true_symlog))
+            true_phys = symlog_inverse(true_symlog)
             pred_R = pred_out[:, :, 1:]
             true_R = true_phys[:, :, 1:] / (torch.abs(true_phys[:, :, 0:1]) + 1.0).detach()
-            # 依然使用 L1 保证收敛的锋利度
-            base_loss_higher = self.l1_loss(pred_R * 1000.0, true_R * 1000.0)
+            base_loss_higher = self.l1_loss(pred_R * self.ratio_scale, true_R * self.ratio_scale)
             weighted_loss_higher = base_loss_higher * self.time_weights
             return weighted_loss_higher.mean()
         
+def _train_step(model, criterion, optimizer, clip_params, batch, stage, device, grad_clip_norm):
+    """单步训练，返回未平均的 loss 值 (用于 epoch 累加)"""
+    b_X, b_A = batch
+    b_X, b_A = b_X.to(device), b_A.to(device)
+    optimizer.zero_grad()
+    pred_A = model(b_X)
+    loss = criterion(pred_A, b_A, stage=stage)
+    loss.backward()
+    if clip_params is not None:
+        torch.nn.utils.clip_grad_norm_(clip_params, max_norm=grad_clip_norm)
+    optimizer.step()
+    return loss.item() * b_X.size(0)
+
+
 def main():
-    best_val_loss_s3 = float('inf')
     train_ds = TransientSequenceDataset(
         os.path.join(PATHS['processed_dir'], "X_train.npy"),
         os.path.join(PATHS['processed_dir'], "A_train.npy")
@@ -80,12 +93,14 @@ def main():
     # 物理与对数异构损失函数
     a_mean_tensor = train_ds.A_mean.clone().detach()
     a_std_tensor = train_ds.A_std.clone().detach()
-    criterion = DualStageRatioLoss(a_mean_tensor, a_std_tensor, device)
+    criterion = DualStageRatioLoss(
+        a_mean_tensor, a_std_tensor, device,
+        end_weight=TRAIN['end_weight'],
+        ratio_scale=TRAIN['ratio_loss_scale']
+    )
 
     # ================= 1. 初始化日志文件 =================
-    log_dir = os.path.join("2D-PINN", "log")
-    os.makedirs(log_dir, exist_ok=True)
-    log_file_path = os.path.join(log_dir, 'training_log.csv')
+    log_file_path = os.path.join(PATHS['log_dir'], 'training_log.csv')
     log_headers = [
         'Epoch', 'Stage', 'Train_Loss', 'Val_Phys_RMSE',
         'M1_MAE', 'M1_RelErr(%)', 
@@ -98,140 +113,120 @@ def main():
     print(f">>> 启动两阶段微调，日志实时保存至: {log_file_path}\n")
 
     # ================= 2. 训练阶段规划 =================
-    # 假设总 Epochs 为 100，前 40 轮算阶段 1，后 60 轮算阶段 2
     total_epochs = TRAIN['epochs']
-    stage1_epochs = int(total_epochs * 0.3)
-    stage2_epochs = int(total_epochs * 0.85)
-    
-    # 定义两套独立的优化器
+    stage1_epochs = int(total_epochs * TRAIN['stage1_ratio'])
+    stage2_epochs = int(total_epochs * TRAIN['stage2_ratio'])
+
+    # 三套独立的优化器
+    wd = TRAIN['weight_decay']
     optimizer_macro = optim.AdamW(
-        list(model.lstm_macro.parameters()) + list(model.fc_mode1_delta.parameters()), 
-        lr=TRAIN['learning_rate'], weight_decay=1e-4
+        list(model.lstm_macro.parameters()) + list(model.fc_mode1_delta.parameters()),
+        lr=TRAIN['learning_rate'], weight_decay=wd
     )
     optimizer_micro = optim.AdamW(
-        list(model.lstm_micro.parameters()) + list(model.fc_higher_modes.parameters()), 
-        lr=TRAIN['learning_rate'], weight_decay=1e-4
+        list(model.lstm_micro.parameters()) + list(model.fc_higher_modes.parameters()),
+        lr=TRAIN['learning_rate'], weight_decay=wd
     )
-    # Stage 3 专属：残差精修优化器 (学习率极小，比如 1e-4)
     optimizer_residual = optim.AdamW(
-        model.fc_mode1_residual.parameters(), 
-        lr=1e-4, weight_decay=1e-5
+        model.fc_mode1_residual.parameters(),
+        lr=TRAIN['residual_lr'], weight_decay=wd * 0.1
     )
 
-    scheduler_macro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_macro, mode='min', factor=0.5, patience=10)
-    scheduler_micro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_micro, mode='min', factor=0.5, patience=10)
+    sf, sp = TRAIN['scheduler_factor'], TRAIN['scheduler_patience']
+    scheduler_macro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_macro, mode='min', factor=sf, patience=sp)
+    scheduler_micro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_micro, mode='min', factor=sf, patience=sp)
 
-    best_val_loss_s1 = float('inf')
-    best_val_loss_s2 = float('inf')
+    # Stage → (optimizer, clip_params) 映射
+    stage_train_cfg = {
+        1: (optimizer_macro, model.lstm_macro.parameters()),
+        2: (optimizer_micro, model.lstm_micro.parameters()),
+        3: (optimizer_residual, model.fc_mode1_residual.parameters()),
+    }
+    # Stage → 验证/保存元信息
+    stage_val_cfg = {
+        1: {"scheduler": scheduler_macro},
+        2: {"scheduler": scheduler_micro},
+        3: {"scheduler": None},
+    }
+
+    best_val_loss = {1: float('inf'), 2: float('inf'), 3: float('inf')}
     current_stage = 1
 
+    # 阶段切换描述
+    stage_transitions = {
+        0: (1, "Stage 1: 训练积分器趋势 (冻结残差)", [model.lstm_macro, model.fc_mode1_delta]),
+        stage1_epochs: (2, "Stage 2: 训练高阶微观模态", [model.lstm_micro, model.fc_higher_modes]),
+        stage2_epochs: (3, "Stage 3: 启动残差补偿，收割宏观末端误差", [model.fc_mode1_residual]),
+    }
+
     # ================= 3. 主循环 =================
+    n_modes = POD['r_fast'] + POD['r_thermal']
+    grad_clip_norm = TRAIN['grad_clip_norm']
+
     for epoch in range(total_epochs):
         epoch_start_time = time.time()
-        
-        # 阶段切换探测与动作执行
-        if epoch == 0:
-            print(">> Stage 1: 训练积分器趋势 (冻结残差)")
-            set_requires_grad(model, False) # 先全部冻结
-            set_requires_grad(model.lstm_macro, True)
-            set_requires_grad(model.fc_mode1_delta, True)
-            
-        elif epoch == stage1_epochs:
-            current_stage = 2
-            print(">> Stage 2: 训练高阶微观模态")
-            set_requires_grad(model, False)
-            set_requires_grad(model.lstm_micro, True)
-            set_requires_grad(model.fc_higher_modes, True)
-            
-        elif epoch == stage2_epochs: # 新增的切换点
-            current_stage = 3
-            print(">> Stage 3: 启动残差补偿，收割宏观末端误差")
-            set_requires_grad(model, False)
-            # 仅仅解冻残差分支
-            set_requires_grad(model.fc_mode1_residual, True)
 
+        # 阶段切换
+        if epoch in stage_transitions:
+            new_stage, msg, unfreeze_modules = stage_transitions[epoch]
+            current_stage = new_stage
+            print(f">> {msg}")
+            set_requires_grad(model, False)
+            for m in unfreeze_modules:
+                set_requires_grad(m, True)
+
+        # 训练
         model.train()
         train_loss_ep = 0.0
-        
-        for b_X, b_A in train_loader:
-            b_X, b_A = b_X.to(device), b_A.to(device)
-            
-            if current_stage == 1:
-                optimizer_macro.zero_grad()
-                pred_A = model(b_X) 
-                loss = criterion(pred_A, b_A, stage=1)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.lstm_macro.parameters(), max_norm=1.0)
-                optimizer_macro.step()
-                
-            elif current_stage == 2:
-                optimizer_micro.zero_grad()
-                pred_A = model(b_X)
-                loss = criterion(pred_A, b_A, stage=2)
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.lstm_micro.parameters(), max_norm=1.0)
-                optimizer_micro.step()
+        opt, clip_params = stage_train_cfg[current_stage]
+        for batch in train_loader:
+            train_loss_ep += _train_step(model, criterion, opt, clip_params, batch, current_stage, device, grad_clip_norm)
 
-            elif current_stage == 3:
-                optimizer_residual.zero_grad()
-                pred_A = model(b_X)
-                # 依然调用 Stage 3 (与 Stage 1 共享算法) 的 loss
-                loss = criterion(pred_A, b_A, stage=3)
-                loss.backward()
-                # 注意：这里只裁剪残差分支的参数
-                torch.nn.utils.clip_grad_norm_(model.fc_mode1_residual.parameters(), max_norm=1.0)
-                optimizer_residual.step() 
-
-            train_loss_ep += loss.item() * b_X.size(0)
-            
-        # ================= 4. 全维度指标测算 (保持不变的透视镜) =================
+        # ================= 4. 全维度指标测算 =================
         model.eval()
         val_mae_m1, val_mae_m2, val_mae_m3 = 0.0, 0.0, 0.0
         val_rel_m1, val_rel_m2, val_rel_m3 = 0.0, 0.0, 0.0
         val_sse_total = 0.0
         stage_val_loss = 0.0
         total_samples = 0
-        
+
+        A_std_dev = train_ds.A_std.to(device)
+        A_mean_dev = train_ds.A_mean.to(device)
+
         with torch.no_grad():
             for b_X, b_A in val_loader:
                 b_X, b_A = b_X.to(device), b_A.to(device)
                 pred_out = model(b_X)
-                
-                # 计算 Loss
-                stage_loss = criterion(pred_out, b_A, stage=current_stage)
                 batch_size = b_X.size(0)
+
+                stage_loss = criterion(pred_out, b_A, stage=current_stage)
                 stage_val_loss += stage_loss.item() * batch_size
                 total_samples += batch_size
-                
-                # --- 物理场透视诊断重构 ---
-                # 1. 真实值正常还原
-                true_symlog = b_A * train_ds.A_std.to(device) + train_ds.A_mean.to(device)
-                true_phys = torch.sign(true_symlog) * torch.expm1(torch.abs(true_symlog))
-                
-                # 2. 预测值进行“时空组装”
+
+                # 物理场透视诊断重构
+                true_symlog = b_A * A_std_dev + A_mean_dev
+                true_phys = symlog_inverse(true_symlog)
+
+                # 预测值时空组装
                 pred_m1_scaled = pred_out[:, :, 0:1]
-                pred_m1_symlog = pred_m1_scaled * train_ds.A_std[:, :, 0:1].to(device) + train_ds.A_mean[:, :, 0:1].to(device)
-                pred_m1_phys = torch.sign(pred_m1_symlog) * torch.expm1(torch.abs(pred_m1_symlog))
-                
-                pred_R = pred_out[:, :, 1:]
-                # 【组装】：形状函数 * 振幅函数 -> 高阶模态物理绝对值！
-                pred_higher_phys = pred_R * pred_m1_phys
-                
-                # 将主模态与组装好的高阶模态重新拼合
+                pred_m1_symlog = pred_m1_scaled * A_std_dev[:, :, 0:1] + A_mean_dev[:, :, 0:1]
+                pred_m1_phys = symlog_inverse(pred_m1_symlog)
+
+                pred_higher_phys = pred_out[:, :, 1:] * pred_m1_phys
                 pred_phys = torch.cat([pred_m1_phys, pred_higher_phys], dim=2)
-                
-                # --- 误差计算（和以前完全一样） ---
+
+                # 误差计算
                 abs_err = torch.abs(pred_phys - true_phys)
                 val_mae_m1 += abs_err[:, :, 0].mean().item() * batch_size
                 val_mae_m2 += abs_err[:, :, 1].mean().item() * batch_size
                 val_mae_m3 += abs_err[:, :, 2].mean().item() * batch_size
-                
+
                 rel_err = abs_err / (torch.abs(true_phys) + 1e-5)
                 val_rel_m1 += rel_err[:, :, 0].mean().item() * batch_size
                 val_rel_m2 += rel_err[:, :, 1].mean().item() * batch_size
                 val_rel_m3 += rel_err[:, :, 2].mean().item() * batch_size
-                
-                val_sse_total += torch.sum((pred_phys - true_phys)**2).item()
+
+                val_sse_total += torch.sum((pred_phys - true_phys) ** 2).item()
 
         # 计算 Epoch 均值
         stage_val_loss /= total_samples
@@ -241,44 +236,25 @@ def main():
         val_rel_m1 /= total_samples
         val_rel_m2 /= total_samples
         val_rel_m3 /= total_samples
-        val_rmse_phys = np.sqrt(val_sse_total / (total_samples * b_X.size(1) * b_A.size(2)))
+        val_rmse_phys = np.sqrt(val_sse_total / (total_samples * PHYSICS['num_time_steps'] * n_modes))
         train_loss_ep /= len(train_ds)
-        
+
         epoch_time = time.time() - epoch_start_time
 
-        # ================= 5. 分阶段独立保存模型 =================
+        # ================= 5. 分阶段保存模型 =================
         saved_flag = ""
-        if current_stage == 1:
-            scheduler_macro.step(stage_val_loss)
-            if stage_val_loss < best_val_loss_s1:
-                best_val_loss_s1 = stage_val_loss
-                saved_flag = "[S1 Saved]"
-                torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
-                    'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
-                }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
-                
-        elif current_stage == 2:
-            scheduler_micro.step(stage_val_loss)
-            if stage_val_loss < best_val_loss_s2:
-                best_val_loss_s2 = stage_val_loss
-                saved_flag = "[S2 Saved]"
-                torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
-                    'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
-                }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
-        elif current_stage == 3:
-            # 残差分支因为学习率很小，不用 scheduler 也行
-            if stage_val_loss < best_val_loss_s3:
-                best_val_loss_s3 = stage_val_loss
-                saved_flag = "[S3 Saved]"
-                torch.save({
-                    'model_state_dict': model.state_dict(),
-                    'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
-                    'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
-                }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
+        meta = stage_val_cfg[current_stage]
+        if meta["scheduler"] is not None:
+            meta["scheduler"].step(stage_val_loss)
+
+        if stage_val_loss < best_val_loss[current_stage]:
+            best_val_loss[current_stage] = stage_val_loss
+            saved_flag = f"[S{current_stage} Saved]"
+            torch.save({
+                'model_state_dict': model.state_dict(),
+                'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
+                'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
+            }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
         # 写入 CSV 日志
         log_row = [
             epoch + 1, current_stage,
