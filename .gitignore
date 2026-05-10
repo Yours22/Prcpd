@@ -1,21 +1,48 @@
-/FEMFFUSION
-*.npy
-/data-raw/*
-/data-gen/*.npy
-/data-gen/prm_cases/*
-/.venv
-.python-version
-uv.lock
-*.npz
-*.pth
-*.pkl
-*.ipynb
-/notes
-backup/dataset_raw/outputs/
-/data-check-plots/*
-/data-processed/power_series_log/*
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-prm_cases/*
-2D-PINN/data-processed/*
+*.ipynb
+
+# 依赖与配置
+/.venv
+.python-version
+uv.lock
+
+# ====== 2D-PINN 输出与数据 ======
+2D-PINN/log/
+2D-PINN/results/
+2D-PINN/ROM/
+2D-PINN/models/
+2D-PINN/pod_models/
+2D-PINN/data-processed/
+
+# ====== 数据管线（大体积） ======
+data-pipeline/data-raw/
+data-pipeline/data-split/
+data-pipeline/data-processed/
+data-pipeline/data-check-plots/
+data-pipeline/data-gen/prm_cases/
+
+# ====== 旧路径兼容 ======
+/data-raw/
+/data-gen/
+/data-split/
+/data-check-plots/
+/data-processed/
+prm_cases/
+
+# FEMFFUSION 二进制
+/FEMFFUSION
+
+# 模型/数据文件
+*.npy
+*.npz
+*.pth
+*.pkl
+
+# Claude 内部
+.claude/
+
+# 论文笔记
+/notes
