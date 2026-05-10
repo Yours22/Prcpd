@@ -13,7 +13,7 @@ TransientSequenceDataset = model_module.TransientSequenceDataset
 
 def main():
     print(">>> 开始生成总功率演化对比图...")
-    case_idx = 20
+    case_idx = 30
 
     # 1. 加载配置
     with open("config.yaml", "r", encoding="utf-8") as f:

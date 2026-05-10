@@ -1,7 +1,8 @@
 # 路径配置
 paths:
-  raw_data_dir: "data-raw/2D_TWIGL_diff"
-  split_data_dir: "data-split"
+  rom_dir: "2D-PINN/ROM/rom_models"
+  raw_data_dir: "data-pipeline/data-raw/2D_TWIGL_diff"
+  split_data_dir: "data-pipeline/data-split"
   processed_dir: "2D-PINN/data-processed"
   pod_save_dir: "2D-PINN/pod_models"
   model_save_dir: "2D-PINN/models"
@@ -25,7 +26,7 @@ pod:
 training:
   input_dim: 10
   batch_size: 128
-  epochs: 800
+  epochs: 1200
   learning_rate: 0.001
   patience: 80                 # 早停容忍度
   lambda_td: 0.5               # 时间导数物理约束权重

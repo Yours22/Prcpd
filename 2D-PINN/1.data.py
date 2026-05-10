@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import pandas as pd
 import pyvista as pv
@@ -12,6 +13,15 @@ PATHS = config['paths']
 PHYSICS = config['physics']
 
 os.makedirs(PATHS['processed_dir'], exist_ok=True)
+
+# 日志
+log_dir = os.path.join("2D-PINN", "log")
+os.makedirs(log_dir, exist_ok=True)
+log_file = open(os.path.join(log_dir, "data_processing_log.txt"), 'w', encoding='utf-8')
+
+def log(msg):
+    print(msg)
+    log_file.write(msg + '\n')
 
 def extract_time_vector(out_file_path):
     time_vector = []
@@ -52,11 +62,15 @@ def extract_flux(vtk_file_path):
     return np.hstack((fast_flux, thermal_flux))
 
 def process_and_save(csv_file, prefix):
+    t0 = time.time()
     csv_path = os.path.join(PATHS['split_data_dir'], csv_file)
-    if not os.path.exists(csv_path): return
-    
+    if not os.path.exists(csv_path):
+        log(f"[{prefix}] 文件 {csv_file} 不存在，跳过")
+        return
+
     df = pd.read_csv(csv_path)
     num_cases = len(df)
+    log(f"\n[{prefix}] 开始处理 — 共 {num_cases} 个算例")
     
     # 【核心重构：将基础特征从 4 维扩展至 6 维】
     # 特征顺序: [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
@@ -64,7 +78,8 @@ def process_and_save(csv_file, prefix):
     Y_matrix = np.zeros((num_cases, PHYSICS['num_time_steps'], PHYSICS['total_nodes']), dtype=np.float32)
     
     valid_indices = []
-    
+    case_ids = []
+
     for i, row in df.iterrows():
         raw_case_id = str(row['case_id'])
         case_id = raw_case_id if raw_case_id.startswith('case_') else f"case_{int(float(raw_case_id)):04d}"
@@ -103,16 +118,44 @@ def process_and_save(csv_file, prefix):
             X_matrix[i, k, :] = [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
             Y_matrix[i, k, :] = extract_flux(vtk_file)
             
-        if is_valid: valid_indices.append(i)
+        if is_valid:
+            valid_indices.append(i)
+            case_ids.append(case_id)
 
     X_matrix = X_matrix[valid_indices]
     Y_matrix = Y_matrix[valid_indices]
-    
+
+    t_vtk = time.time() - t0
+
     np.save(os.path.join(PATHS['processed_dir'], f"X_{prefix}.npy"), X_matrix)
     np.save(os.path.join(PATHS['processed_dir'], f"Y_{prefix}_raw.npy"), Y_matrix)
-    print(f"{prefix} 集处理完成: 全新特征 X 形状 {X_matrix.shape}, 物理场 Y 形状 {Y_matrix.shape}")
+    log(f"  有效算例: {X_matrix.shape[0]}/{num_cases} (过滤 {num_cases - X_matrix.shape[0]} 个)")
+    log(f"  X 特征: {X_matrix.shape} (float32), 约 {X_matrix.nbytes / 1024**2:.1f} MB")
+    log(f"  Y 物理场: {Y_matrix.shape} (float32), 约 {Y_matrix.nbytes / 1024**2:.1f} MB")
+
+    # 保存可读的特征 CSV（平铺所有时间步，方便直接检查）
+    feature_names = ['is_reg1', 'is_reg2', 'is_fast', 'is_thermal', 'p_t', 't']
+    rows = []
+    for ci, case_id in enumerate(case_ids):
+        for ts in range(X_matrix.shape[1]):
+            row = [case_id, ts] + X_matrix[ci, ts].tolist()
+            rows.append(row)
+    df_features = pd.DataFrame(rows, columns=['case_id', 'time_step'] + feature_names)
+    csv_out = os.path.join(PATHS['processed_dir'], f"X_{prefix}_features.csv")
+    df_features.to_csv(csv_out, index=False)
+    log(f"  特征 CSV: {csv_out}")
+    log(f"  耗时: {t_vtk:.1f}s")
 
 if __name__ == "__main__":
+    t_total = time.time()
+    log("数据提取处理开始")
+    log(f"物理配置: {PHYSICS['num_time_steps']} 时间步, {PHYSICS['total_nodes']} 节点 ({PHYSICS['num_nodes_per_group']} 快群 + {PHYSICS['num_nodes_per_group']} 热群)")
+
     process_and_save('dataset_train.csv', 'train')
     process_and_save('dataset_val.csv', 'val')
     process_and_save('dataset_test_extrapolation.csv', 'test')
+
+    t_elapsed = time.time() - t_total
+    log(f"\n全部处理完成，总耗时: {t_elapsed:.1f}s")
+    log_file.close()
+    print(f"\n日志已保存至: {log_dir}/data_processing_log.txt")

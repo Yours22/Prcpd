@@ -32,21 +32,16 @@ class DualStageRatioLoss(nn.Module):
         self.a_std = a_std.view(1, 1, -1).to(device)
         self.l1_loss = nn.L1Loss(reduction='none')
         
-        # 1. 保留指数级时间加权，按住末端的爆炸尾巴
+        # 指数时间加权，按住末端的爆炸尾巴
         exponent = torch.linspace(0, np.log(end_weight), steps=seq_len).view(1, -1, 1).to(device)
         weights = torch.exp(exponent)
         
-        # ================= 终极补丁：浴缸加权 (锚定初始条件) =================
-        # 强行给前 5 个时间步施加与末端同等（甚至更高）的极限权重！
-        # 这将逼迫网络绝对不准在起点乱跳，必须从物理原点老老实实出发。
-        weights[:, 0:5, :] = end_weight * 1.5  
-        # ====================================================================
+        weights[:, 0:5, :] = end_weight * 0.8
         
         self.time_weights = weights / weights.mean()
 
     def forward(self, pred_out, true_scaled, stage):
-        # ... (这里的 forward 代码完全保持上一次的逻辑，无需改动) ...
-        if stage == 1:
+        if stage == 1 or stage ==3:
             pred_m1_scaled = pred_out[:, :, 0:1]
             true_m1_scaled = true_scaled[:, :, 0:1]
             mag_weights = torch.abs(true_m1_scaled) + 1.0
@@ -65,6 +60,7 @@ class DualStageRatioLoss(nn.Module):
             return weighted_loss_higher.mean()
         
 def main():
+    best_val_loss_s3 = float('inf')
     train_ds = TransientSequenceDataset(
         os.path.join(PATHS['processed_dir'], "X_train.npy"),
         os.path.join(PATHS['processed_dir'], "A_train.npy")
@@ -87,7 +83,9 @@ def main():
     criterion = DualStageRatioLoss(a_mean_tensor, a_std_tensor, device)
 
     # ================= 1. 初始化日志文件 =================
-    log_file_path = os.path.join(PATHS['output_dir'], 'training_log.csv')
+    log_dir = os.path.join("2D-PINN", "log")
+    os.makedirs(log_dir, exist_ok=True)
+    log_file_path = os.path.join(log_dir, 'training_log.csv')
     log_headers = [
         'Epoch', 'Stage', 'Train_Loss', 'Val_Phys_RMSE',
         'M1_MAE', 'M1_RelErr(%)', 
@@ -102,7 +100,8 @@ def main():
     # ================= 2. 训练阶段规划 =================
     # 假设总 Epochs 为 100，前 40 轮算阶段 1，后 60 轮算阶段 2
     total_epochs = TRAIN['epochs']
-    stage1_epochs = int(total_epochs * 0.3) 
+    stage1_epochs = int(total_epochs * 0.3)
+    stage2_epochs = int(total_epochs * 0.85)
     
     # 定义两套独立的优化器
     optimizer_macro = optim.AdamW(
@@ -113,7 +112,12 @@ def main():
         list(model.lstm_micro.parameters()) + list(model.fc_higher_modes.parameters()), 
         lr=TRAIN['learning_rate'], weight_decay=1e-4
     )
-    
+    # Stage 3 专属：残差精修优化器 (学习率极小，比如 1e-4)
+    optimizer_residual = optim.AdamW(
+        model.fc_mode1_residual.parameters(), 
+        lr=1e-4, weight_decay=1e-5
+    )
+
     scheduler_macro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_macro, mode='min', factor=0.5, patience=10)
     scheduler_micro = optim.lr_scheduler.ReduceLROnPlateau(optimizer_micro, mode='min', factor=0.5, patience=10)
 
@@ -127,21 +131,24 @@ def main():
         
         # 阶段切换探测与动作执行
         if epoch == 0:
-            print(f"\n========== 进入 Stage 1：锚定宏观能量演化 (锁定 Mode 1) ==========")
-            set_requires_grad(model.lstm_micro, False)
-            set_requires_grad(model.fc_higher_modes, False)
+            print(">> Stage 1: 训练积分器趋势 (冻结残差)")
+            set_requires_grad(model, False) # 先全部冻结
             set_requires_grad(model.lstm_macro, True)
             set_requires_grad(model.fc_mode1_delta, True)
             
         elif epoch == stage1_epochs:
             current_stage = 2
-            print(f"\n========== 进入 Stage 2：精雕微观空间形变 (冻结 Mode 1，激活 Mode 2~16) ==========")
-            # 锁定已训练好的宏观干道
-            set_requires_grad(model.lstm_macro, False)
-            set_requires_grad(model.fc_mode1_delta, False)
-            # 唤醒微观干道
+            print(">> Stage 2: 训练高阶微观模态")
+            set_requires_grad(model, False)
             set_requires_grad(model.lstm_micro, True)
             set_requires_grad(model.fc_higher_modes, True)
+            
+        elif epoch == stage2_epochs: # 新增的切换点
+            current_stage = 3
+            print(">> Stage 3: 启动残差补偿，收割宏观末端误差")
+            set_requires_grad(model, False)
+            # 仅仅解冻残差分支
+            set_requires_grad(model.fc_mode1_residual, True)
 
         model.train()
         train_loss_ep = 0.0
@@ -164,7 +171,17 @@ def main():
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.lstm_micro.parameters(), max_norm=1.0)
                 optimizer_micro.step()
-                
+
+            elif current_stage == 3:
+                optimizer_residual.zero_grad()
+                pred_A = model(b_X)
+                # 依然调用 Stage 3 (与 Stage 1 共享算法) 的 loss
+                loss = criterion(pred_A, b_A, stage=3)
+                loss.backward()
+                # 注意：这里只裁剪残差分支的参数
+                torch.nn.utils.clip_grad_norm_(model.fc_mode1_residual.parameters(), max_norm=1.0)
+                optimizer_residual.step() 
+
             train_loss_ep += loss.item() * b_X.size(0)
             
         # ================= 4. 全维度指标测算 (保持不变的透视镜) =================
@@ -252,7 +269,16 @@ def main():
                     'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
                     'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
                 }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
-
+        elif current_stage == 3:
+            # 残差分支因为学习率很小，不用 scheduler 也行
+            if stage_val_loss < best_val_loss_s3:
+                best_val_loss_s3 = stage_val_loss
+                saved_flag = "[S3 Saved]"
+                torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'X_mean': train_ds.X_mean, 'X_std': train_ds.X_std,
+                    'A_mean': train_ds.A_mean, 'A_std': train_ds.A_std
+                }, os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"))
         # 写入 CSV 日志
         log_row = [
             epoch + 1, current_stage,

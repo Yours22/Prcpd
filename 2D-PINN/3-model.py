@@ -66,14 +66,18 @@ class POD_LSTM(nn.Module):
         self.lstm_macro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.lstm_micro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         
-        # 宏观通道 FC：注意，这里预测的不再是绝对幅值，而是相邻时间步的【增量 Delta】
         self.fc_mode1_delta = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.SiLU(),
             nn.Linear(hidden_dim // 2, 1)
         )
-        
-        # 微观通道 FC：依然预测平缓的形状比值 R
+
+        self.fc_mode1_residual = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.Tanh(),  
+            nn.Linear(hidden_dim // 2, 1)
+        )
+
         self.fc_higher_modes = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.SiLU(),
@@ -82,22 +86,23 @@ class POD_LSTM(nn.Module):
         )
 
     def forward(self, x):
-        # ================= 宏观干道：导数预测与内部积分 =================
+        # --- 宏观干道提取特征 ---
         lstm_out_macro, _ = self.lstm_macro(x) 
         
-        # 1. 网络输出每个时间步的增量 (Derivative / Growth Rate)
-        # 在瞬态后期，这个 delta 会聪明地收敛为一个常数
+        # 1. 计算宏观趋势 (积分器)
         delta_m1 = self.fc_mode1_delta(lstm_out_macro)
+        pred_m1_trend = torch.cumsum(delta_m1, dim=1)
         
-        # 2. 物理积分层 (Neural Integration)
-        # 沿着时间维度 (dim=1) 进行累加：y_t = y_0 + sum(delta_1 ... delta_t)
-        # 这一步瞬间将常数/有界的输出，转化为了可以无限突破天际的指数爆炸曲线！
-        pred_m1_scaled = torch.cumsum(delta_m1, dim=1)
-        # ================================================================
+        # ================= 新增：计算残差并硬拼接 =================
+        # 直接由 LSTM 状态映射出瞬时残差 (不经过 cumsum！)
+        m1_residual = self.fc_mode1_residual(lstm_out_macro)
+        
+        # 最终的宏观振幅 = 苦力趋势 + 狙击手残差
+        pred_m1_scaled = pred_m1_trend + m1_residual
+        # ==========================================================
 
-        # ================= 微观干道：维持比值预测 =================
+        # --- 微观干道 ---
         lstm_out_micro, _ = self.lstm_micro(x) 
         pred_R = self.fc_higher_modes(lstm_out_micro)  
-        # ==========================================================
         
         return torch.cat([pred_m1_scaled, pred_R], dim=2)
