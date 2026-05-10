@@ -1,0 +1,23 @@
+{
+    "files.watcherExclude": {
+        "**/data-pipeline/data-raw/**": true,
+        "**/data-pipeline/data-split/**": true,
+        "**/data-pipeline/data-processed/**": true,
+        "**/data-pipeline/data-check-plots/**": true,
+        "**/data-pipeline/data-gen/prm_cases/**": true,
+        "**/2D-PINN/results/**": true,
+        "**/2D-PINN/log/**": true,
+        "**/2D-PINN/models/**": true,
+        "**/2D-PINN/pod_models/**": true,
+        "**/2D-PINN/ROM/**": true,
+        "**/2D-PINN/data-processed/**": true,
+        "**/.claude/**": true
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/__pycache__": true,
+        "**/*.pyc": true
+    },
+    "git.autoRefresh": true,
+    "git.detectSubmodules": false
+}
