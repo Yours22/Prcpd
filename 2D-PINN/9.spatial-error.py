@@ -3,6 +3,10 @@ import numpy as np
 import yaml
 import matplotlib.pyplot as plt
 from datetime import datetime
+from importlib import import_module
+
+_model_mod = import_module("3-model")
+get_output_root = _model_mod.get_output_root
 
 with open("config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
@@ -12,7 +16,9 @@ PHYSICS = config['physics']
 N_NODES = PHYSICS['num_nodes_per_group']  # 400
 NX = NY = int(np.sqrt(N_NODES))  # 20
 
-LOG_DIR = PATHS['log_dir']
+ROOT = get_output_root()
+RESULT_DIR = os.path.join(ROOT, 'results')
+LOG_DIR = os.path.join(ROOT, 'log')
 os.makedirs(LOG_DIR, exist_ok=True)
 
 PLOT_TIME_STEPS = [10, 50, 90]
@@ -101,7 +107,7 @@ def analyze(data_prefix, out_subdir):
     log_print(log_file, f"Spatial Error Analysis — {timestamp}")
     log_print(log_file, f"Dataset: {set_label}\n")
 
-    out_dir = os.path.join(PATHS['output_dir'], out_subdir)
+    out_dir = os.path.join(RESULT_DIR, out_subdir)
     os.makedirs(out_dir, exist_ok=True)
 
     Y_pred = np.load(os.path.join(out_dir, "Y_pred.npy"))
