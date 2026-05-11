@@ -41,6 +41,9 @@ prm_cases/
 *.pth
 *.pkl
 
+# 备份
+backups/
+
 # Claude 内部
 .claude/
 

@@ -21,15 +21,18 @@ PHYSICS = config['physics']
 os.makedirs(PATHS['output_dir'], exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ==================== 轨迹图绘制索引（在此数组中修改要绘图的 case） ====================
 PLOT_CASE_INDICES = [0, 10, 20, 30, 40]
 
+
 def log_print(log_file, *args, **kwargs):
-    """同时输出到控制台和日志文件"""
-    print(*args, **kwargs)
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        pass
     print(*args, **kwargs, file=log_file)
 
-def plot_trajectories(A_true, A_pred, case_idx=0, log_file=None):
+
+def plot_trajectories(A_true, A_pred, case_idx, out_dir, log_file):
     time_steps = np.arange(PHYSICS['num_time_steps'])
     fig, axes = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
     for i in range(4):
@@ -37,81 +40,87 @@ def plot_trajectories(A_true, A_pred, case_idx=0, log_file=None):
         axes[i].plot(time_steps, A_pred[case_idx, :, i], 'r--', linewidth=2, label='Predicted (LSTM)')
         axes[i].set_ylabel(f'Mode {i+1}')
         axes[i].grid(True, linestyle=':', alpha=0.6)
-        if i == 0: axes[i].legend(loc='best')
+        if i == 0:
+            axes[i].legend(loc='best')
 
     axes[-1].set_xlabel('Time Step')
     plt.suptitle(f"Principal Component Trajectories - Case {case_idx}")
     plt.tight_layout()
-    plt.savefig(os.path.join(PATHS['output_dir'], f"trajectory_case_{case_idx}.png"), dpi=300)
-    msg = f"轨迹对比图已保存至 {PATHS['output_dir']}/trajectory_case_{case_idx}.png"
-    log_print(log_file, msg)
+    plt.savefig(os.path.join(out_dir, f"trajectory_case_{case_idx}.png"), dpi=300)
+    plt.close()
+    log_print(log_file, f"  轨迹对比图已保存: trajectory_case_{case_idx}.png")
 
-def main():
-    # 打开日志文件
-    log_dir = PATHS['log_dir']
-    os.makedirs(log_dir, exist_ok=True)
+
+def evaluate_test_set(model, ckpt, data_prefix, log_dir):
+    """
+    data_prefix: 'val' → 同分布验证集, 'test' → 外推测试集
+    返回日志文件路径
+    """
+    # --- 输出子目录 ---
+    if data_prefix == 'val':
+        output_name = 'val'
+        set_label = '验证集 (同分布)'
+    else:
+        output_name = 'test_extrap'
+        set_label = '外推测试集'
+
+    out_dir = os.path.join(PATHS['output_dir'], output_name)
+    os.makedirs(out_dir, exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(log_dir, f"test_log_{timestamp}.txt")
+    log_path = os.path.join(log_dir, f"test_log_{output_name}_{timestamp}.txt")
     log_file = open(log_path, 'w', encoding='utf-8')
-    log_print(log_file, f"测试日志 — {timestamp}")
+
+    log_print(log_file, f"评测日志 — {timestamp}")
+    log_print(log_file, f"数据集: {set_label}")
     log_print(log_file, f"模型: {PATHS['model_save_dir']}/best_pod_lstm.pth\n")
 
-    X_test_raw = np.load(os.path.join(PATHS['processed_dir'], "X_test.npy"))
-    A_test_true = np.load(os.path.join(PATHS['processed_dir'], "A_test.npy"))
-    Y_test_raw = np.load(os.path.join(PATHS['processed_dir'], "Y_test_raw.npy"))
+    # --- 加载数据 ---
+    X_raw = np.load(os.path.join(PATHS['processed_dir'], f"X_{data_prefix}.npy"))
+    A_true = np.load(os.path.join(PATHS['processed_dir'], f"A_{data_prefix}.npy"))
+    Y_raw = np.load(os.path.join(PATHS['processed_dir'], f"Y_{data_prefix}_raw.npy"))
 
-    num_cases, num_steps, _ = X_test_raw.shape
-    log_print(log_file, f"测试集规模: {num_cases} 算例, {num_steps} 时间步")
+    num_cases, num_steps, _ = X_raw.shape
+    log_print(log_file, f"数据规模: {num_cases} 算例, {num_steps} 时间步")
 
-    # ================= 特征工程 =================
-    # 在独热编码下：[is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
-    p_t = X_test_raw[:, :, 4]
-
+    # --- 特征工程 ---
+    p_t = X_raw[:, :, 4]
     dt = PHYSICS['dt']
     decay_lambdas = PHYSICS['decay_constants']
 
     decay_features = []
     for lam in decay_lambdas:
         integral = np.zeros((num_cases, num_steps))
-        for t in range(1, num_steps):
-            integral[:, t] = integral[:, t-1] * np.exp(-lam * dt) + p_t[:, t] * dt
+        for t_step in range(1, num_steps):
+            integral[:, t_step] = integral[:, t_step - 1] * np.exp(-lam * dt) + p_t[:, t_step] * dt
         decay_features.append(integral[:, :, np.newaxis])
 
     simple_integral = np.cumsum(p_t, axis=1) * dt
     decay_features.append(simple_integral[:, :, np.newaxis])
 
-    # 拼接后变为 10 维
-    X_test_enhanced = np.concatenate([X_test_raw] + decay_features, axis=-1)
+    X_enhanced = np.concatenate([X_raw] + decay_features, axis=-1)
 
-    ckpt = torch.load(os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"), map_location=device)
+    # --- 标准化 + 推理 ---
     X_mean, X_std = ckpt['X_mean'].cpu().numpy(), ckpt['X_std'].cpu().numpy()
     A_mean, A_std = ckpt['A_mean'].cpu().numpy(), ckpt['A_std'].cpu().numpy()
 
-    X_test_scaled = (X_test_enhanced - X_mean) / X_std
-    X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32).to(device)
-
-    output_dim = POD['r_fast'] + POD['r_thermal']
-    model = POD_LSTM(10, TRAIN['hidden_dim'], output_dim, TRAIN.get('num_layers', 2)).to(device)
-    model.load_state_dict(ckpt['model_state_dict'])
-    model.eval()
+    X_scaled = (X_enhanced - X_mean) / X_std
+    X_tensor = torch.tensor(X_scaled, dtype=torch.float32).to(device)
 
     with torch.no_grad():
-        pred_out_raw = model(X_test_tensor).cpu().numpy()
+        pred_out_raw = model(X_tensor).cpu().numpy()
 
-    # ================= 时空组装逻辑 (Amplitude-Shape) =================
+    # --- 时空组装 (Amplitude-Shape) ---
     pred_m1_scaled = pred_out_raw[:, :, 0:1]
     pred_R = pred_out_raw[:, :, 1:]
 
-    # 1. 主振幅 P(t) 逆向对数还原
     pred_m1_symlog = pred_m1_scaled * A_std[:, :, 0:1] + A_mean[:, :, 0:1]
     pred_m1_phys = np.sign(pred_m1_symlog) * np.expm1(np.abs(pred_m1_symlog))
 
-    # 2. 物理组装：形状比值 R(t) * 绝对振幅 P(t)
     pred_higher_phys = pred_R * pred_m1_phys
-
-    # 3. 拼合出完整的高维系数矩阵
     A_pred = np.concatenate([pred_m1_phys, pred_higher_phys], axis=2)
 
+    # --- SVD 逆变换重建物理场 ---
     svd_fast = joblib.load(os.path.join(PATHS['pod_save_dir'], 'svd_fast.pkl'))
     svd_thermal = joblib.load(os.path.join(PATHS['pod_save_dir'], 'svd_thermal.pkl'))
 
@@ -123,37 +132,39 @@ def main():
 
     Y_pred = np.concatenate([Y_pred_fast, Y_pred_thermal], axis=1).reshape(N, T, -1)
 
-    abs_error = np.abs(Y_pred - Y_test_raw)
-    rel_error_per_sample = np.linalg.norm(Y_pred - Y_test_raw, axis=(1,2)) / np.linalg.norm(Y_test_raw, axis=(1,2))
+    # --- 全局误差 ---
+    abs_error = np.abs(Y_pred - Y_raw)
+    rel_error_per_sample = np.linalg.norm(Y_pred - Y_raw, axis=(1, 2)) / np.linalg.norm(Y_raw, axis=(1, 2))
 
-    log_print(log_file, f"\n========== 测试集推理完成 (详细诊断) ==========")
+    log_print(log_file, f"\n========== 全局误差 ==========")
     log_print(log_file, f"全局最大绝对误差 (Max Error): {np.max(abs_error):.6e}")
     log_print(log_file, f"全局平均绝对误差 (Mean Error): {np.mean(abs_error):.6e}")
-    log_print(log_file, f"样本平均相对误差 (L2 Norm): {np.mean(rel_error_per_sample)*100:.4f}%\n")
+    log_print(log_file, f"样本平均相对误差 (L2 Norm): {np.mean(rel_error_per_sample)*100:.4f}%")
 
-    norm_diff_t = np.linalg.norm(Y_pred - Y_test_raw, axis=(0, 2))
-    norm_true_t = np.linalg.norm(Y_test_raw, axis=(0, 2))
+    # --- 时间分段误差 ---
+    norm_diff_t = np.linalg.norm(Y_pred - Y_raw, axis=(0, 2))
+    norm_true_t = np.linalg.norm(Y_raw, axis=(0, 2))
     rel_err_t = norm_diff_t / (norm_true_t + 1e-10)
 
-    log_print(log_file, f"【时间分段相对误差】")
-    log_print(log_file, f"-> 前期 (t=00~30): {np.mean(rel_err_t[:30])*100:.4f}%")
-    log_print(log_file, f"-> 中期 (t=30~70): {np.mean(rel_err_t[30:70])*100:.4f}%")
-    log_print(log_file, f"-> 后期 (t=70~100): {np.mean(rel_err_t[70:])*100:.4f}%\n")
+    log_print(log_file, f"\n========== 时间分段相对误差 ==========")
+    log_print(log_file, f"前期 (t=00~30): {np.mean(rel_err_t[:30])*100:.4f}%")
+    log_print(log_file, f"中期 (t=30~70): {np.mean(rel_err_t[30:70])*100:.4f}%")
+    log_print(log_file, f"后期 (t=70~100): {np.mean(rel_err_t[70:])*100:.4f}%")
 
-    log_print(log_file, f"【POD 独立误差】")
+    # --- POD 逐模态误差 ---
+    log_print(log_file, f"\n========== POD 逐模态相对误差 ==========")
     for i in range(min(4, A_pred.shape[-1])):
-        true_mode = A_test_true[:, :, i]
+        true_mode = A_true[:, :, i]
         pred_mode = A_pred[:, :, i]
         mode_rel_err = np.linalg.norm(pred_mode - true_mode) / (np.linalg.norm(true_mode) + 1e-10)
-        log_print(log_file, f"-> Mode {i+1} 相对误差 = {mode_rel_err*100:.4f}%")
+        log_print(log_file, f"Mode {i+1}: {mode_rel_err*100:.4f}%")
 
-    # ================= 按物理参数分类评估 =================
-    # 从独热编码推断类别（取第一时间步，类别不随时间变化）
-    is_reg1  = X_test_raw[:, 0, 0]   # material_changing = 1 (核心区)
-    is_fast  = X_test_raw[:, 0, 2]   # group_changing = 1 (快群)
+    # --- 按物理参数分类评估 ---
+    is_reg1 = X_raw[:, 0, 0]
+    is_fast = X_raw[:, 0, 2]
 
     region = np.where(is_reg1 == 1, "Core", "Rod")
-    group  = np.where(is_fast == 1, "Fast", "Thermal")
+    group = np.where(is_fast == 1, "Fast", "Thermal")
 
     categories = {}
     for r in ["Core", "Rod"]:
@@ -166,37 +177,64 @@ def main():
     log_print(log_file, f"{'类别':<20} {'样本数':>6} {'平均RelErr':>10} {'前期':>8} {'中期':>8} {'后期':>8}")
     log_print(log_file, f"{'-'*60}")
 
-    for name, mask in categories.items():
+    for cat_name, mask in categories.items():
         idx = np.where(mask)[0]
         if len(idx) == 0:
             continue
 
         group_rel = rel_error_per_sample[idx]
-        norm_diff_g = np.linalg.norm(Y_pred[idx] - Y_test_raw[idx], axis=(0, 2))
-        norm_true_g = np.linalg.norm(Y_test_raw[idx], axis=(0, 2))
+        norm_diff_g = np.linalg.norm(Y_pred[idx] - Y_raw[idx], axis=(0, 2))
+        norm_true_g = np.linalg.norm(Y_raw[idx], axis=(0, 2))
         rel_err_g = norm_diff_g / (norm_true_g + 1e-10)
 
         log_print(log_file,
-            f"{name:<20} {len(idx):>6} "
-            f"{np.mean(group_rel)*100:>9.2f}% "
-            f"{np.mean(rel_err_g[:30])*100:>7.2f}% "
-            f"{np.mean(rel_err_g[30:70])*100:>7.2f}% "
-            f"{np.mean(rel_err_g[70:])*100:>7.2f}%")
+                  f"{cat_name:<20} {len(idx):>6} "
+                  f"{np.mean(group_rel)*100:>9.2f}% "
+                  f"{np.mean(rel_err_g[:30])*100:>7.2f}% "
+                  f"{np.mean(rel_err_g[30:70])*100:>7.2f}% "
+                  f"{np.mean(rel_err_g[70:])*100:>7.2f}%")
 
-    np.save(os.path.join(PATHS['output_dir'], "Y_test_pred.npy"), Y_pred)
-    np.save(os.path.join(PATHS['output_dir'], "A_test_pred.npy"), A_pred)
-    log_print(log_file, f"\n预测结果已保存: Y_test_pred.npy, A_test_pred.npy")
+    # --- 保存预测结果 ---
+    np.save(os.path.join(out_dir, "Y_pred.npy"), Y_pred)
+    np.save(os.path.join(out_dir, "A_pred.npy"), A_pred)
+    log_print(log_file, f"\n预测结果已保存: {out_dir}/{{Y_pred,A_pred}}.npy")
 
-    log_print(log_file, f"\n========== 轨迹图生成 ==========")
-    
+    # --- 轨迹图 ---
+    log_print(log_file, f"\n========== 轨迹图 ==========")
     for idx in PLOT_CASE_INDICES:
         if idx < N:
-            plot_trajectories(A_test_true, A_pred, case_idx=idx, log_file=log_file)
+            plot_trajectories(A_true, A_pred, case_idx=idx, out_dir=out_dir, log_file=log_file)
         else:
-            log_print(log_file, f"  [跳过] Case {idx} 超出测试集范围 (共 {N} 个算例)")
+            log_print(log_file, f"  [跳过] Case {idx} 超出范围 (共 {N} 个算例)")
 
     log_file.close()
-    print(f"\n日志已保存至: {log_path}")
+    print(f"  Log saved to: {log_path}")
+    return log_path
+
+
+def main():
+    log_dir = PATHS['log_dir']
+    os.makedirs(log_dir, exist_ok=True)
+
+    # --- 加载模型（只加载一次） ---
+    ckpt = torch.load(
+        os.path.join(PATHS['model_save_dir'], "best_pod_lstm.pth"),
+        map_location=device
+    )
+
+    output_dim = POD['r_fast'] + POD['r_thermal']
+    model = POD_LSTM(10, TRAIN['hidden_dim'], output_dim, TRAIN.get('num_layers', 2)).to(device)
+    model.load_state_dict(ckpt['model_state_dict'])
+    model.eval()
+
+    # --- 评测两个集 ---
+    for data_prefix in ['val', 'test']:
+        label = 'Val (in-distribution)' if data_prefix == 'val' else 'Test (extrapolation)'
+        print(f"\n{'='*60}")
+        print(f"Evaluating: {label}")
+        print(f"{'='*60}")
+        evaluate_test_set(model, ckpt, data_prefix, log_dir)
+
 
 if __name__ == "__main__":
     main()

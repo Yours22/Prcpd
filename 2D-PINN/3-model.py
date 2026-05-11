@@ -2,53 +2,75 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 import numpy as np
+import yaml
 
-# 输入特征列索引 (由 1.data.py 定义)
-# [is_reg1, is_reg2, is_fast, is_thermal, p_t, t]
+with open("config.yaml", "r", encoding="utf-8") as f:
+    _cfg = yaml.safe_load(f)
+_ABLATION = _cfg.get('ablation', {})
+
 P_T_IDX = 4
 
+
 def symlog_inverse(x):
-    """SymLog 逆变换: sign(x) * expm1(|x|) — 用于从 SymLog 空间还原物理值"""
     return torch.sign(x) * torch.expm1(torch.abs(x))
 
 
+def get_ablation():
+    return _ABLATION.get('mode', 'full')
+
+
+def get_output_root():
+    """消融输出根目录"""
+    label = _ABLATION.get('label', get_ablation())
+    return f"2D-PINN/ablation/{label}"
+
+
 class TransientSequenceDataset(Dataset):
-    def __init__(self, X_npy_path, A_npy_path, X_stats=None, A_stats=None, decay_lambdas=[0.1, 1.0, 10.0], dt=0.005):
+    def __init__(self, X_npy_path, A_npy_path, X_stats=None, A_stats=None,
+                 decay_lambdas=None, dt=0.005, ablation_mode=None):
+        if decay_lambdas is None:
+            decay_lambdas = [0.1, 1.0, 10.0]
+        if ablation_mode is None:
+            ablation_mode = get_ablation()
+
+        no_decay = (ablation_mode == 'no_decay')
+        no_symlog = (ablation_mode == 'no_symlog')
+
         raw_X = np.load(X_npy_path)
         self.A = torch.tensor(np.load(A_npy_path), dtype=torch.float32)
-        
         num_cases, num_steps, _ = raw_X.shape
-        p_t = raw_X[:, :, P_T_IDX]
 
-        # 指数衰减积分 (模拟不同时间尺度的先驱核记忆效应)
-        decay_features = []
-        for lam in decay_lambdas:
-            integral = np.zeros((num_cases, num_steps))
-            for t in range(1, num_steps):
-                integral[:, t] = integral[:, t-1] * np.exp(-lam * dt) + p_t[:, t] * dt
-            decay_features.append(integral[:, :, np.newaxis])
+        if no_decay:
+            combined_X = raw_X
+        else:
+            p_t = raw_X[:, :, P_T_IDX]
+            decay_features = []
+            for lam in decay_lambdas:
+                integral = np.zeros((num_cases, num_steps))
+                for t in range(1, num_steps):
+                    integral[:, t] = integral[:, t - 1] * np.exp(-lam * dt) + p_t[:, t] * dt
+                decay_features.append(integral[:, :, np.newaxis])
+            simple_integral = np.cumsum(p_t, axis=1) * dt
+            decay_features.append(simple_integral[:, :, np.newaxis])
+            combined_X = np.concatenate([raw_X] + decay_features, axis=-1)
 
-        # 简单累积积分
-        simple_integral = np.cumsum(p_t, axis=1) * dt
-        decay_features.append(simple_integral[:, :, np.newaxis])
-
-        # 拼接原始特征与积分特征 → 10 维
-        combined_X = np.concatenate([raw_X] + decay_features, axis=-1)
         self.X = torch.tensor(combined_X, dtype=torch.float32)
+        self.input_dim = combined_X.shape[-1]
 
-        # SymLog 变换压缩指数爆发的动态范围
-        self.A = torch.sign(self.A) * torch.log1p(torch.abs(self.A))
+        # SymLog
+        if not no_symlog:
+            self.A = torch.sign(self.A) * torch.log1p(torch.abs(self.A))
 
         # 标准化 X
         if X_stats is None:
             self.X_mean = self.X.mean(dim=(0, 1), keepdim=True)
             self.X_std = self.X.std(dim=(0, 1), keepdim=True)
-            self.X_std[self.X_std == 0] = 1e-5 
+            self.X_std[self.X_std == 0] = 1e-5
         else:
             self.X_mean, self.X_std = X_stats
         self.X = (self.X - self.X_mean) / self.X_std
 
-        # 标准化 A (此时 A 已在 SymLog 空间)
+        # 标准化 A
         if A_stats is None:
             self.A_mean = self.A.mean(dim=(0, 1), keepdim=True)
             self.A_std = self.A.std(dim=(0, 1), keepdim=True)
@@ -65,49 +87,69 @@ class TransientSequenceDataset(Dataset):
 
 
 class POD_LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=2):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=2, ablation_mode=None):
         super(POD_LSTM, self).__init__()
-        
-        self.lstm_macro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
-        self.lstm_micro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
-        
-        self.fc_mode1_delta = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.SiLU(),
-            nn.Linear(hidden_dim // 2, 1)
-        )
+        if ablation_mode is None:
+            ablation_mode = get_ablation()
+        self.ablation_mode = ablation_mode
+        self.output_dim = output_dim
 
-        self.fc_mode1_residual = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.Tanh(),  
-            nn.Linear(hidden_dim // 2, 1)
-        )
+        if ablation_mode == 'no_amp_shape':
+            # 消融 1: 单 LSTM 直接预测所有模态
+            self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+            self.fc_all = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.SiLU(),
+                nn.Dropout(0.1),
+                nn.Linear(hidden_dim, output_dim),
+            )
+        else:
+            # 完整/其他消融: 双流架构
+            self.lstm_macro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+            self.lstm_micro = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
 
-        self.fc_higher_modes = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
-            nn.Dropout(0.1),
-            nn.Linear(hidden_dim, output_dim - 1)
-        )
+            if ablation_mode == 'no_cumsum':
+                # Mode 1 直接回归
+                self.fc_mode1_direct = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim // 2),
+                    nn.SiLU(),
+                    nn.Linear(hidden_dim // 2, 1)
+                )
+            else:
+                # 完整: cumsum + residual
+                self.fc_mode1_delta = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim // 2),
+                    nn.SiLU(),
+                    nn.Linear(hidden_dim // 2, 1)
+                )
+                self.fc_mode1_residual = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim // 2),
+                    nn.Tanh(),
+                    nn.Linear(hidden_dim // 2, 1)
+                )
+
+            self.fc_higher_modes = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.SiLU(),
+                nn.Dropout(0.1),
+                nn.Linear(hidden_dim, output_dim - 1)
+            )
 
     def forward(self, x):
-        # --- 宏观干道提取特征 ---
-        lstm_out_macro, _ = self.lstm_macro(x) 
-        
-        # 1. 计算宏观趋势 (积分器)
-        delta_m1 = self.fc_mode1_delta(lstm_out_macro)
-        pred_m1_trend = torch.cumsum(delta_m1, dim=1)
-        
-        # ================= 新增：计算残差并硬拼接 =================
-        # 直接由 LSTM 状态映射出瞬时残差 (不经过 cumsum！)
-        m1_residual = self.fc_mode1_residual(lstm_out_macro)
-        
-        # 最终的宏观振幅 = 苦力趋势 + 狙击手残差
-        pred_m1_scaled = pred_m1_trend + m1_residual
-        # ==========================================================
+        if self.ablation_mode == 'no_amp_shape':
+            lstm_out, _ = self.lstm(x)
+            return self.fc_all(lstm_out)
 
-        # --- 微观干道 ---
-        lstm_out_micro, _ = self.lstm_micro(x) 
-        pred_R = self.fc_higher_modes(lstm_out_micro)  
-        
+        lstm_out_macro, _ = self.lstm_macro(x)
+        lstm_out_micro, _ = self.lstm_micro(x)
+
+        if self.ablation_mode == 'no_cumsum':
+            pred_m1_scaled = self.fc_mode1_direct(lstm_out_macro)
+        else:
+            delta_m1 = self.fc_mode1_delta(lstm_out_macro)
+            pred_m1_trend = torch.cumsum(delta_m1, dim=1)
+            m1_residual = self.fc_mode1_residual(lstm_out_macro)
+            pred_m1_scaled = pred_m1_trend + m1_residual
+
+        pred_R = self.fc_higher_modes(lstm_out_micro)
         return torch.cat([pred_m1_scaled, pred_R], dim=2)

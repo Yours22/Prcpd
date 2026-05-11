@@ -45,3 +45,8 @@ training:
   scheduler_patience: 10
   scheduler_factor: 0.5
   grad_clip_norm: 1.0
+
+# 消融实验控制
+ablation:
+  mode: "full"       # full | no_amp_shape | no_decay | no_symlog | no_cumsum
+  label: "full"      # 输出根目录名 (2D-PINN/ablation/<label>/)
