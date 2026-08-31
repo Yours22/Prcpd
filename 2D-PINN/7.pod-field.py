@@ -34,7 +34,7 @@ def main():
     
     # --- 图 1：平均场 (Mean Field) ---
     # 使用 jet 色带，因为通量全为正值
-    im0 = axes[0].imshow(mean_field, cmap='jet', origin='lower')
+    im0 = axes[0].imshow(mean_field, cmap='viridis', origin='lower')
     axes[0].set_title("Mean Field\n(Average Base Flux)", fontsize=16, fontweight='bold')
     axes[0].axis('off') # 关闭坐标轴显得更干净
     cbar0 = fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)

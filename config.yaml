@@ -48,5 +48,5 @@ training:
 
 # 消融实验控制
 ablation:
-  mode: "full"  # full | no_amp_shape | no_decay | no_symlog | no_cumsum
-  label: "full"
+  mode: "no_cumsum"  # full | no_amp_shape | no_decay | no_symlog | no_cumsum
+  label: "no_cumsum"

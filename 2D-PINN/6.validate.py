@@ -122,19 +122,19 @@ def restore_and_visualize():
                 grid_err = np.abs(grid_true - grid_pred)
                 plot_vmin, plot_vmax = grid_true.min(), grid_true.max()
 
-                im0 = axes[0, i].imshow(grid_true, cmap='jet', origin='lower', vmin=plot_vmin, vmax=plot_vmax)
+                im0 = axes[0, i].imshow(grid_true, cmap='viridis', origin='lower', vmin=plot_vmin, vmax=plot_vmax)
                 axes[0, i].set_title(f"True {title_pfix}\nt={t}", fontsize=11)
                 plt.colorbar(im0, ax=axes[0, i], fraction=0.046, pad=0.04)
 
                 curr_pred_ax = axes[1, i]
                 
-                im2 = axes[2, i].imshow(grid_err, cmap='hot', origin='lower')
+                im2 = axes[2, i].imshow(grid_err, cmap='inferno', origin='lower')
                 axes[2, i].set_title(f"Abs Error\nt={t}", fontsize=11)
                 plt.colorbar(im2, ax=axes[2, i], fraction=0.046, pad=0.04)
             else:
                 curr_pred_ax = axes[0, i]
 
-            im1 = curr_pred_ax.imshow(grid_pred, cmap='jet', origin='lower', vmin=plot_vmin, vmax=plot_vmax)
+            im1 = curr_pred_ax.imshow(grid_pred, cmap='viridis', origin='lower', vmin=plot_vmin, vmax=plot_vmax)
             curr_pred_ax.set_title(f"Pred {title_pfix}\nt={t}", fontsize=11)
             plt.colorbar(im1, ax=curr_pred_ax, fraction=0.046, pad=0.04)
             

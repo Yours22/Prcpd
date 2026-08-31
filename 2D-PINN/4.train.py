@@ -16,6 +16,9 @@ symlog_inverse = model_module.symlog_inverse
 get_ablation = model_module.get_ablation
 get_output_root = model_module.get_output_root
 
+from grad_monitor import GradientMonitor, diagnose_gradient_flow, log_gradient_summary
+GRAD_MONITOR_ENABLED = TRAIN.get('grad_monitor', True)
+
 with open("config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 PATHS, TRAIN, POD, PHYSICS = config['paths'], config['training'], config['pod'], config['physics']
@@ -83,7 +86,7 @@ class SimpleWeightedL1Loss(nn.Module):
         return (base_loss * self.time_weights * mag_weights).mean()
 
 
-def _train_step(model, criterion, optimizer, clip_params, batch, stage, device, grad_clip_norm):
+def _train_step(model, criterion, optimizer, clip_params, batch, stage, device, grad_clip_norm, grad_monitor=None):
     b_X, b_A = batch
     b_X, b_A = b_X.to(device), b_A.to(device)
     optimizer.zero_grad()
@@ -96,6 +99,8 @@ def _train_step(model, criterion, optimizer, clip_params, batch, stage, device, 
     if clip_params is not None:
         torch.nn.utils.clip_grad_norm_(clip_params, max_norm=grad_clip_norm)
     optimizer.step()
+    if grad_monitor is not None:
+        grad_monitor.step()
     return loss.item() * b_X.size(0)
 
 
@@ -127,6 +132,10 @@ def main():
     model = POD_LSTM(input_dim, TRAIN['hidden_dim'], output_dim,
                      TRAIN.get('num_layers', 2), ablation_mode=ablation_mode).to(device)
 
+    # 梯度监控
+    grad_monitor = GradientMonitor(model, enabled=GRAD_MONITOR_ENABLED,
+                                    log_every_n_steps=TRAIN.get('grad_log_interval', 50))
+
     # 损失函数
     a_mean_tensor = train_ds.A_mean.clone().detach()
     a_std_tensor = train_ds.A_std.clone().detach()
@@ -144,7 +153,9 @@ def main():
     log_file_path = os.path.join(LOG_DIR, 'training_log.csv')
     log_headers = ['Epoch', 'Stage', 'Train_Loss', 'Val_Phys_RMSE',
                    'M1_MAE', 'M1_RelErr(%)', 'M2_MAE', 'M2_RelErr(%)',
-                   'M3_MAE', 'M3_RelErr(%)', 'Time_Cost(s)']
+                   'M3_MAE', 'M3_RelErr(%)',
+                   'Grad_Total', 'Grad_MacroMicro_Ratio',
+                   'Time_Cost(s)']
     with open(log_file_path, mode='w', newline='', encoding='utf-8') as f:
         csv.writer(f).writerow(log_headers)
     print(f">>> Training log: {log_file_path}\n")
@@ -247,6 +258,10 @@ def main():
             set_requires_grad(model, False)
             for m in unfreeze_modules:
                 set_requires_grad(m, True)
+            # 阶段切换时运行梯度诊断
+            if GRAD_MONITOR_ENABLED:
+                sample_batch = next(iter(train_loader))
+                diagnose_gradient_flow(model, sample_batch, criterion, current_stage, device)
 
         # 训练
         model.train()
@@ -254,7 +269,7 @@ def main():
         opt, clip_params = stage_train_cfg[current_stage]
         for batch in train_loader:
             train_loss_ep += _train_step(model, criterion, opt, clip_params, batch,
-                                         current_stage, device, grad_clip_norm)
+                                         current_stage, device, grad_clip_norm, grad_monitor)
 
         # 验证
         model.eval()
@@ -350,12 +365,18 @@ def main():
                 'ablation_mode': ablation_mode,
             }, os.path.join(MODEL_DIR, "best_pod_lstm.pth"))
 
+        # 梯度摘要
+        g_summary = grad_monitor.summary() if GRAD_MONITOR_ENABLED else {}
+        g_total = g_summary.get('max_grad', 0.0)
+        g_ratio = grad_monitor.macro_micro_ratio() if (GRAD_MONITOR_ENABLED and not no_amp and ablation_mode != 'no_cumsum') else 0.0
+
         log_row = [
             epoch + 1, current_stage,
             f"{train_loss_ep:.4f}", f"{val_rmse_phys:.4e}",
             f"{val_mae_m1:.4e}", f"{val_rel_m1*100:.2f}",
             f"{val_mae_m2:.4e}", f"{val_rel_m2*100:.2f}",
             f"{val_mae_m3:.4e}", f"{val_rel_m3*100:.2f}",
+            f"{g_total:.2e}", f"{g_ratio:.4f}",
             f"{epoch_time:.1f}"
         ]
         with open(log_file_path, mode='a', newline='', encoding='utf-8') as f:

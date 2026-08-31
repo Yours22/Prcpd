@@ -1,0 +1,313 @@
+Spatial Error Analysis — 20260511_112247
+Dataset: Test (extrapolation)
+
+Cases: 148  Time steps: 101
+
+====================================================================================================
+SUMMARY B: Per-category spatial error (decimal)
+[Unit: same as neutron flux]
+====================================================================================================
+Category                n  Flux      Early(0-30)   Mid(30-70) Late(70-100)     Time-avg
+----------------------------------------------------------------------------------------------------
+Core + Fast            16  Fast           1.4335       1.5474       0.9211       1.3213
+Core + Fast            16  Thermal        4.1564       4.4016       4.4112       4.3317
+Core + Thermal         61  Fast           2.0437      19.7161      64.8338      28.3149
+Core + Thermal         61  Thermal        5.5148      24.7097      56.6082      28.7989
+Rod + Fast             21  Fast           1.5075       1.7910       1.9948       1.7694
+Rod + Fast             21  Thermal        4.1320       4.3721       4.3917       4.3068
+Rod + Thermal          50  Fast           2.3060       9.2757      41.6321      17.1367
+Rod + Thermal          50  Thermal        5.1796      18.6115      43.5716      22.2828
+====================================================================================================
+
+====================================================================================================
+SUMMARY D: Zone x Category spatial error (decimal)
+[Zone: Z1=Core fuel, Z2=Blanket, Z3=Control rod | unit = neutron flux]
+====================================================================================================
+Category                n  Zone               Flux      Early(0-30)   Mid(30-70) Late(70-100)     Time-avg
+----------------------------------------------------------------------------------------------------
+Core + Fast            16  Z1 (Core fuel)     Fast           0.8445       0.8703       0.5320       0.7588
+Core + Fast            16  Z1 (Core fuel)     Thermal        3.8162       4.0481       4.0574       3.9820
+Core + Fast            16  Z2 (Blanket)       Fast           2.5997       3.2699       1.7705       2.6106
+Core + Fast            16  Z2 (Blanket)       Thermal        5.1745       5.4742       5.4879       5.3894
+Core + Fast            16  Z3 (Control rod)   Fast           1.8926       1.5025       1.1059       1.4966
+Core + Fast            16  Z3 (Control rod)   Thermal        3.9048       4.1183       4.1233       4.0564
+Core + Thermal         61  Z1 (Core fuel)     Fast           1.1914      10.7870      42.6147      17.7057
+Core + Thermal         61  Z1 (Core fuel)     Thermal        5.1137      23.4067      53.6535      27.2568
+Core + Thermal         61  Z2 (Blanket)       Fast           3.2388      32.5893     113.8817      48.8225
+Core + Thermal         61  Z2 (Blanket)       Thermal        6.7918      29.7422      68.0424      34.6807
+Core + Thermal         61  Z3 (Control rod)   Fast           3.4470      33.8905      74.5834      37.3378
+Core + Thermal         61  Z3 (Control rod)   Thermal        5.1037      22.0473      50.5375      25.7590
+Rod + Fast             21  Z1 (Core fuel)     Fast           0.8966       0.9321       1.0525       0.9585
+Rod + Fast             21  Z1 (Core fuel)     Thermal        3.7906       4.0134       4.0310       3.9526
+Rod + Fast             21  Z2 (Blanket)       Fast           2.6022       3.9387       4.3020       3.6532
+Rod + Fast             21  Z2 (Blanket)       Thermal        5.1444       5.4374       5.4624       5.3580
+Rod + Fast             21  Z3 (Control rod)   Fast           2.1563       1.7906       2.0676       1.9842
+Rod + Fast             21  Z3 (Control rod)   Thermal        3.8934       4.1195       4.1380       4.0580
+Rod + Thermal          50  Z1 (Core fuel)     Fast           1.3929       5.6484      24.7010      10.2322
+Rod + Thermal          50  Z1 (Core fuel)     Thermal        4.7383      16.9300      39.5854      20.2623
+Rod + Thermal          50  Z2 (Blanket)       Fast           3.9932      15.9710      71.1995      29.3646
+Rod + Thermal          50  Z2 (Blanket)       Thermal        6.4159      22.7284      53.0808      27.1992
+Rod + Thermal          50  Z3 (Control rod)   Fast           3.1991      12.8349      60.7728      24.6864
+Rod + Thermal          50  Z3 (Control rod)   Thermal        4.9798      18.7419      44.2558      22.4851
+====================================================================================================
+
+====================================================================================================
+SUMMARY A: Per-category spatial error (scientific)
+[Unit: same as neutron flux]
+====================================================================================================
+Category                n  Flux      Early(0-30)   Mid(30-70) Late(70-100)     Time-avg
+----------------------------------------------------------------------------------------------------
+Core + Fast            16  Fast       1.4335e+00   1.5474e+00   9.2105e-01   1.3213e+00
+Core + Fast            16  Thermal    4.1564e+00   4.4016e+00   4.4112e+00   4.3317e+00
+Core + Thermal         61  Fast       2.0437e+00   1.9716e+01   6.4834e+01   2.8315e+01
+Core + Thermal         61  Thermal    5.5148e+00   2.4710e+01   5.6608e+01   2.8799e+01
+Rod + Fast             21  Fast       1.5075e+00   1.7910e+00   1.9948e+00   1.7694e+00
+Rod + Fast             21  Thermal    4.1320e+00   4.3721e+00   4.3917e+00   4.3068e+00
+Rod + Thermal          50  Fast       2.3060e+00   9.2757e+00   4.1632e+01   1.7137e+01
+Rod + Thermal          50  Thermal    5.1796e+00   1.8611e+01   4.3572e+01   2.2283e+01
+====================================================================================================
+
+====================================================================================================
+SUMMARY C: Zone x Category spatial error (scientific)
+[Zone: Z1=Core fuel, Z2=Blanket, Z3=Control rod | unit = neutron flux]
+====================================================================================================
+Category                n  Zone               Flux      Early(0-30)   Mid(30-70) Late(70-100)     Time-avg
+----------------------------------------------------------------------------------------------------
+Core + Fast            16  Z1 (Core fuel)     Fast       8.4453e-01   8.7030e-01   5.3198e-01   7.5880e-01
+Core + Fast            16  Z1 (Core fuel)     Thermal    3.8162e+00   4.0481e+00   4.0574e+00   3.9820e+00
+Core + Fast            16  Z2 (Blanket)       Fast       2.5997e+00   3.2699e+00   1.7705e+00   2.6106e+00
+Core + Fast            16  Z2 (Blanket)       Thermal    5.1745e+00   5.4742e+00   5.4879e+00   5.3894e+00
+Core + Fast            16  Z3 (Control rod)   Fast       1.8926e+00   1.5025e+00   1.1059e+00   1.4966e+00
+Core + Fast            16  Z3 (Control rod)   Thermal    3.9048e+00   4.1183e+00   4.1233e+00   4.0564e+00
+Core + Thermal         61  Z1 (Core fuel)     Fast       1.1914e+00   1.0787e+01   4.2615e+01   1.7706e+01
+Core + Thermal         61  Z1 (Core fuel)     Thermal    5.1137e+00   2.3407e+01   5.3653e+01   2.7257e+01
+Core + Thermal         61  Z2 (Blanket)       Fast       3.2388e+00   3.2589e+01   1.1388e+02   4.8822e+01
+Core + Thermal         61  Z2 (Blanket)       Thermal    6.7918e+00   2.9742e+01   6.8042e+01   3.4681e+01
+Core + Thermal         61  Z3 (Control rod)   Fast       3.4470e+00   3.3890e+01   7.4583e+01   3.7338e+01
+Core + Thermal         61  Z3 (Control rod)   Thermal    5.1037e+00   2.2047e+01   5.0537e+01   2.5759e+01
+Rod + Fast             21  Z1 (Core fuel)     Fast       8.9664e-01   9.3211e-01   1.0525e+00   9.5851e-01
+Rod + Fast             21  Z1 (Core fuel)     Thermal    3.7906e+00   4.0134e+00   4.0310e+00   3.9526e+00
+Rod + Fast             21  Z2 (Blanket)       Fast       2.6022e+00   3.9387e+00   4.3020e+00   3.6532e+00
+Rod + Fast             21  Z2 (Blanket)       Thermal    5.1444e+00   5.4374e+00   5.4624e+00   5.3580e+00
+Rod + Fast             21  Z3 (Control rod)   Fast       2.1563e+00   1.7906e+00   2.0676e+00   1.9842e+00
+Rod + Fast             21  Z3 (Control rod)   Thermal    3.8934e+00   4.1195e+00   4.1380e+00   4.0580e+00
+Rod + Thermal          50  Z1 (Core fuel)     Fast       1.3929e+00   5.6484e+00   2.4701e+01   1.0232e+01
+Rod + Thermal          50  Z1 (Core fuel)     Thermal    4.7383e+00   1.6930e+01   3.9585e+01   2.0262e+01
+Rod + Thermal          50  Z2 (Blanket)       Fast       3.9932e+00   1.5971e+01   7.1199e+01   2.9365e+01
+Rod + Thermal          50  Z2 (Blanket)       Thermal    6.4159e+00   2.2728e+01   5.3081e+01   2.7199e+01
+Rod + Thermal          50  Z3 (Control rod)   Fast       3.1991e+00   1.2835e+01   6.0773e+01   2.4686e+01
+Rod + Thermal          50  Z3 (Control rod)   Thermal    4.9798e+00   1.8742e+01   4.4256e+01   2.2485e+01
+====================================================================================================
+
+
+============================================================
+Category: Core + Fast  (n=16)
+============================================================
+
+  --- Fast Flux (absolute error) ---
+  Time-avg mean=1.3213e+00  max=3.4173e+00 at (row=11, col=0)
+  Time-avg Top-5 hotspots:
+    #1: (12, 0) = 3.4173e+00
+    #2: (19, 7) = 3.4173e+00
+    #3: (19, 8) = 3.4173e+00
+    #4: (11, 0) = 3.4173e+00
+    #5: (10, 0) = 3.3340e+00
+  Early(0-30) mean=1.4335e+00  max=3.1884e+00 at (row=11, col=0)
+  Early(0-30) Top-5 hotspots:
+    #1: (19, 8) = 3.1884e+00
+    #2: (19, 7) = 3.1884e+00
+    #3: (11, 0) = 3.1884e+00
+    #4: (12, 0) = 3.1884e+00
+    #5: (12, 2) = 3.1189e+00
+  Late(70-100) mean=9.2105e-01  max=2.4855e+00 at (row=11, col=0)
+  Late(70-100) Top-5 hotspots:
+    #1: (19, 7) = 2.4855e+00
+    #2: (19, 8) = 2.4855e+00
+    #3: (11, 0) = 2.4855e+00
+    #4: (12, 0) = 2.4855e+00
+    #5: (19, 9) = 2.4512e+00
+
+  --- Thermal Flux (absolute error) ---
+  Time-avg mean=4.3317e+00  max=1.3238e+01 at (row=15, col=3)
+  Time-avg Top-5 hotspots:
+    #1: (16, 4) = 1.3238e+01
+    #2: (16, 3) = 1.3238e+01
+    #3: (15, 4) = 1.3238e+01
+    #4: (15, 3) = 1.3238e+01
+    #5: (17, 3) = 1.3095e+01
+  Early(0-30) mean=4.1563e+00  max=1.2679e+01 at (row=15, col=3)
+  Early(0-30) Top-5 hotspots:
+    #1: (16, 4) = 1.2679e+01
+    #2: (16, 3) = 1.2679e+01
+    #3: (15, 4) = 1.2679e+01
+    #4: (15, 3) = 1.2679e+01
+    #5: (17, 3) = 1.2534e+01
+  Late(70-100) mean=4.4112e+00  max=1.3498e+01 at (row=15, col=3)
+  Late(70-100) Top-5 hotspots:
+    #1: (16, 4) = 1.3498e+01
+    #2: (16, 3) = 1.3498e+01
+    #3: (15, 4) = 1.3498e+01
+    #4: (15, 3) = 1.3498e+01
+    #5: (17, 3) = 1.3359e+01
+
+  Representative case: 116 (L2 rel err = 8.52%)
+  Plot saved: 2D-PINN/ablation/no_symlog\results\test_extrap\spatial_error_case116_Core_+_Fast.png
+
+============================================================
+Category: Core + Thermal  (n=61)
+============================================================
+
+  --- Fast Flux (absolute error) ---
+  Time-avg mean=2.8315e+01  max=5.8125e+01 at (row=11, col=0)
+  Time-avg Top-5 hotspots:
+    #1: (12, 0) = 5.8125e+01
+    #2: (19, 8) = 5.8125e+01
+    #3: (19, 7) = 5.8125e+01
+    #4: (11, 0) = 5.8125e+01
+    #5: (19, 6) = 5.7960e+01
+  Early(0-30) mean=2.0437e+00  max=4.2714e+00 at (row=11, col=7)
+  Early(0-30) Top-5 hotspots:
+    #1: (11, 8) = 4.2714e+00
+    #2: (11, 7) = 4.2714e+00
+    #3: (12, 7) = 4.2714e+00
+    #4: (12, 8) = 4.2714e+00
+    #5: (11, 9) = 4.2419e+00
+  Late(70-100) mean=6.4834e+01  max=1.5325e+02 at (row=19, col=0)
+  Late(70-100) Top-5 hotspots:
+    #1: (19, 0) = 1.5325e+02
+    #2: (17, 0) = 1.5147e+02
+    #3: (18, 0) = 1.5147e+02
+    #4: (19, 2) = 1.5147e+02
+    #5: (19, 1) = 1.5147e+02
+
+  --- Thermal Flux (absolute error) ---
+  Time-avg mean=2.8799e+01  max=9.2020e+01 at (row=15, col=1)
+  Time-avg Top-5 hotspots:
+    #1: (18, 3) = 9.2020e+01
+    #2: (18, 4) = 9.2020e+01
+    #3: (17, 3) = 9.2020e+01
+    #4: (15, 2) = 9.2020e+01
+    #5: (15, 1) = 9.2020e+01
+  Early(0-30) mean=5.5148e+00  max=1.7063e+01 at (row=15, col=3)
+  Early(0-30) Top-5 hotspots:
+    #1: (16, 4) = 1.7063e+01
+    #2: (16, 3) = 1.7063e+01
+    #3: (15, 4) = 1.7063e+01
+    #4: (15, 3) = 1.7063e+01
+    #5: (17, 3) = 1.6959e+01
+  Late(70-100) mean=5.6608e+01  max=1.8137e+02 at (row=15, col=1)
+  Late(70-100) Top-5 hotspots:
+    #1: (18, 3) = 1.8137e+02
+    #2: (18, 4) = 1.8137e+02
+    #3: (17, 3) = 1.8137e+02
+    #4: (15, 2) = 1.8137e+02
+    #5: (15, 1) = 1.8137e+02
+
+  Representative case: 92 (L2 rel err = 10.77%)
+  Plot saved: 2D-PINN/ablation/no_symlog\results\test_extrap\spatial_error_case92_Core_+_Thermal.png
+
+============================================================
+Category: Rod + Fast  (n=21)
+============================================================
+
+  --- Fast Flux (absolute error) ---
+  Time-avg mean=1.7694e+00  max=4.5039e+00 at (row=11, col=0)
+  Time-avg Top-5 hotspots:
+    #1: (12, 0) = 4.5039e+00
+    #2: (11, 0) = 4.5039e+00
+    #3: (19, 8) = 4.5039e+00
+    #4: (19, 7) = 4.5039e+00
+    #5: (10, 0) = 4.4496e+00
+  Early(0-30) mean=1.5075e+00  max=3.0440e+00 at (row=11, col=0)
+  Early(0-30) Top-5 hotspots:
+    #1: (19, 8) = 3.0440e+00
+    #2: (19, 7) = 3.0440e+00
+    #3: (11, 0) = 3.0440e+00
+    #4: (12, 0) = 3.0440e+00
+    #5: (12, 2) = 3.0176e+00
+  Late(70-100) mean=1.9948e+00  max=5.3539e+00 at (row=11, col=0)
+  Late(70-100) Top-5 hotspots:
+    #1: (11, 0) = 5.3539e+00
+    #2: (12, 0) = 5.3539e+00
+    #3: (19, 8) = 5.3539e+00
+    #4: (19, 7) = 5.3539e+00
+    #5: (19,10) = 5.3085e+00
+
+  --- Thermal Flux (absolute error) ---
+  Time-avg mean=4.3068e+00  max=1.3104e+01 at (row=15, col=3)
+  Time-avg Top-5 hotspots:
+    #1: (16, 4) = 1.3104e+01
+    #2: (16, 3) = 1.3104e+01
+    #3: (15, 4) = 1.3104e+01
+    #4: (15, 3) = 1.3104e+01
+    #5: (17, 3) = 1.2943e+01
+  Early(0-30) mean=4.1320e+00  max=1.2576e+01 at (row=15, col=3)
+  Early(0-30) Top-5 hotspots:
+    #1: (16, 4) = 1.2576e+01
+    #2: (16, 3) = 1.2576e+01
+    #3: (15, 4) = 1.2576e+01
+    #4: (15, 3) = 1.2576e+01
+    #5: (17, 3) = 1.2424e+01
+  Late(70-100) mean=4.3917e+00  max=1.3364e+01 at (row=15, col=3)
+  Late(70-100) Top-5 hotspots:
+    #1: (16, 4) = 1.3364e+01
+    #2: (16, 3) = 1.3364e+01
+    #3: (15, 4) = 1.3364e+01
+    #4: (15, 3) = 1.3364e+01
+    #5: (17, 3) = 1.3203e+01
+
+  Representative case: 119 (L2 rel err = 8.89%)
+  Plot saved: 2D-PINN/ablation/no_symlog\results\test_extrap\spatial_error_case119_Rod_+_Fast.png
+
+============================================================
+Category: Rod + Thermal  (n=50)
+============================================================
+
+  --- Fast Flux (absolute error) ---
+  Time-avg mean=1.7137e+01  max=3.3727e+01 at (row=11, col=0)
+  Time-avg Top-5 hotspots:
+    #1: (19, 8) = 3.3727e+01
+    #2: (19, 7) = 3.3727e+01
+    #3: (11, 0) = 3.3727e+01
+    #4: (12, 0) = 3.3727e+01
+    #5: (12, 2) = 3.3592e+01
+  Early(0-30) mean=2.3060e+00  max=4.6491e+00 at (row=11, col=0)
+  Early(0-30) Top-5 hotspots:
+    #1: (11, 0) = 4.6491e+00
+    #2: (19, 7) = 4.6491e+00
+    #3: (19, 8) = 4.6491e+00
+    #4: (12, 0) = 4.6491e+00
+    #5: (11, 2) = 4.6160e+00
+  Late(70-100) mean=4.1632e+01  max=8.1106e+01 at (row=11, col=5)
+  Late(70-100) Top-5 hotspots:
+    #1: (11, 6) = 8.1106e+01
+    #2: (12, 6) = 8.1106e+01
+    #3: (14, 7) = 8.1106e+01
+    #4: (14, 8) = 8.1106e+01
+    #5: (12, 5) = 8.1106e+01
+
+  --- Thermal Flux (absolute error) ---
+  Time-avg mean=2.2283e+01  max=6.5375e+01 at (row=15, col=3)
+  Time-avg Top-5 hotspots:
+    #1: (16, 4) = 6.5375e+01
+    #2: (15, 3) = 6.5375e+01
+    #3: (15, 4) = 6.5375e+01
+    #4: (16, 3) = 6.5375e+01
+    #5: (18, 4) = 6.4209e+01
+  Early(0-30) mean=5.1796e+00  max=1.5609e+01 at (row=15, col=3)
+  Early(0-30) Top-5 hotspots:
+    #1: (16, 3) = 1.5609e+01
+    #2: (15, 4) = 1.5609e+01
+    #3: (15, 3) = 1.5609e+01
+    #4: (16, 4) = 1.5609e+01
+    #5: (16, 1) = 1.5398e+01
+  Late(70-100) mean=4.3572e+01  max=1.2736e+02 at (row=15, col=3)
+  Late(70-100) Top-5 hotspots:
+    #1: (16, 4) = 1.2736e+02
+    #2: (15, 4) = 1.2736e+02
+    #3: (15, 3) = 1.2736e+02
+    #4: (16, 3) = 1.2736e+02
+    #5: (18, 3) = 1.2502e+02
+
+  Representative case: 62 (L2 rel err = 9.93%)
+  Plot saved: 2D-PINN/ablation/no_symlog\results\test_extrap\spatial_error_case62_Rod_+_Thermal.png

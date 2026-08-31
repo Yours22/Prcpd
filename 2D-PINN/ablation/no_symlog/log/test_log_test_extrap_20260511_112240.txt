@@ -1,0 +1,39 @@
+评测日志 — 20260511_112240
+Ablation: no_symlog
+数据集: Test (extrapolation)
+模型: 2D-PINN/ablation/no_symlog/models/best_pod_lstm.pth
+
+数据规模: 148 算例, 101 时间步
+
+========== 全局误差 ==========
+全局最大绝对误差 (Max Error): 1.668400e+03
+全局平均绝对误差 (Mean Error): 1.916541e+01
+样本平均相对误差 (L2 Norm): 10.9137%
+
+========== 时间分段相对误差 ==========
+前期 (t=00~30): 8.9154%
+中期 (t=30~70): 11.2373%
+后期 (t=70~100): 15.5607%
+
+========== POD 逐模态相对误差 ==========
+Mode 1: 13.4939%
+Mode 2: 99.6574%
+Mode 3: 101.5610%
+Mode 4: 103.6305%
+
+========== 按物理参数分类评估 ==========
+类别                      样本数   平均RelErr       前期       中期       后期
+------------------------------------------------------------
+Core + Fast              16      8.60%    8.66%    8.78%    8.25%
+Core + Thermal           61     12.35%    8.87%   12.20%   16.20%
+Rod + Fast               21      8.93%    8.67%    8.93%    9.10%
+Rod + Thermal            50     10.73%    9.03%    9.36%   14.57%
+
+预测结果已保存: 2D-PINN/ablation/no_symlog\results\test_extrap/{Y_pred,A_pred}.npy
+
+========== 轨迹图 ==========
+  轨迹对比图已保存: trajectory_case_0.png
+  轨迹对比图已保存: trajectory_case_10.png
+  轨迹对比图已保存: trajectory_case_20.png
+  轨迹对比图已保存: trajectory_case_30.png
+  轨迹对比图已保存: trajectory_case_40.png

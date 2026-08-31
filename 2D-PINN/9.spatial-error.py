@@ -82,7 +82,7 @@ def plot_rep_case(Y_pred, Y_true, case_idx, group_name, out_dir):
             err = np.abs(Y_pred[case_idx, t, offset:offset + N_NODES] -
                          Y_true[case_idx, t, offset:offset + N_NODES])
             grid = err.reshape(NY, NX)
-            im = ax.imshow(grid, cmap='hot', origin='lower', aspect='equal')
+            im = ax.imshow(grid, cmap='inferno', origin='lower', aspect='equal')
             ax.set_title(f"{flux_name} Flux  t={t}")
             plt.colorbar(im, ax=ax, fraction=0.046)
 

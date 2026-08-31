@@ -1,0 +1,39 @@
+评测日志 — 20260511_111808
+Ablation: no_decay
+数据集: Val (in-distribution)
+模型: 2D-PINN/ablation/no_decay/models/best_pod_lstm.pth
+
+数据规模: 150 算例, 101 时间步
+
+========== 全局误差 ==========
+全局最大绝对误差 (Max Error): 1.462805e+02
+全局平均绝对误差 (Mean Error): 5.423489e-01
+样本平均相对误差 (L2 Norm): 0.7906%
+
+========== 时间分段相对误差 ==========
+前期 (t=00~30): 1.9419%
+中期 (t=30~70): 1.9014%
+后期 (t=70~100): 1.9332%
+
+========== POD 逐模态相对误差 ==========
+Mode 1: 1.9132%
+Mode 2: 2.3551%
+Mode 3: 2.7421%
+Mode 4: 17.1551%
+
+========== 按物理参数分类评估 ==========
+类别                      样本数   平均RelErr       前期       中期       后期
+------------------------------------------------------------
+Core + Fast              38      1.18%    2.82%    2.34%    2.29%
+Core + Thermal           43      0.59%    0.65%    1.32%    0.44%
+Rod + Fast               31      0.94%    1.97%    1.19%    0.55%
+Rod + Thermal            38      0.51%    1.18%    1.30%    0.68%
+
+预测结果已保存: 2D-PINN/ablation/no_decay\results\val/{Y_pred,A_pred}.npy
+
+========== 轨迹图 ==========
+  轨迹对比图已保存: trajectory_case_0.png
+  轨迹对比图已保存: trajectory_case_10.png
+  轨迹对比图已保存: trajectory_case_20.png
+  轨迹对比图已保存: trajectory_case_30.png
+  轨迹对比图已保存: trajectory_case_40.png

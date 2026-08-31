@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 550" width="100%" height="100%">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#4e8fd6" />
+    </marker>
+  </defs>
+
+  <style>
+    .txt { font-family: 'Arial', sans-serif; font-size: 14px; text-anchor: middle; fill: #333; }
+    .txt-sm { font-family: 'Arial', sans-serif; font-size: 13px; text-anchor: middle; fill: #333; }
+    .box { fill: none; stroke: #ccc; stroke-width: 1px; rx: 4px; }
+    .box-white { fill: white; stroke: #ccc; stroke-width: 1px; rx: 4px; }
+    .box-gold { fill: white; stroke: #b89035; stroke-width: 2px; rx: 4px; }
+    
+    .hdr-blue { fill: #d9e8f5; }
+    .hdr-green { fill: #dcf0db; }
+    .hdr-purple { fill: #efe4f5; }
+    .bar-dark { fill: #286133; }
+    .bar-blue { fill: #2164bf; }
+    
+    .t-blue { fill: #1d5b99; font-weight: bold; }
+    .t-green { fill: #286b28; font-weight: bold; }
+    .t-purple { fill: #633973; font-weight: bold; }
+    .t-white { fill: white; font-weight: bold; }
+    
+    .arrow-line { fill: none; stroke: #4e8fd6; stroke-width: 3px; marker-end: url(#arrowhead); }
+    .conn-line { fill: none; stroke: #aaa; stroke-width: 1px; }
+  </style>
+
+  <rect x="20" y="20" width="280" height="65" class="box-white"/>
+  <text x="160" y="42" class="txt">物理参数</text>
+  <text x="160" y="62" class="txt-sm">扰动截面变化 p(t) · 归一化时间 t</text>
+
+  <rect x="320" y="20" width="310" height="65" class="box-white"/>
+  <text x="475" y="42" class="txt">离散运行状态</text>
+  <text x="475" y="62" class="txt-sm">One-hot 编码 · 扰动区域 + 能群</text>
+
+  <rect x="650" y="20" width="330" height="65" class="box-gold"/>
+  <text x="815" y="42" class="txt">物理记忆特征</text>
+  <text x="815" y="62" class="txt-sm">时间尺度指数衰减积分 ∫ exp(-λ<tspan baseline-shift="sub" font-size="10">i</tspan> · τ) · Φ(r, t - τ) dτ</text>
+
+  <polyline points="160,85 160,95 815,95 815,85" class="conn-line" />
+  <line x1="475" y1="85" x2="475" y2="95" class="conn-line" />
+  <line x1="500" y1="95" x2="500" y2="110" class="conn-line" />
+
+  <rect x="390" y="110" width="220" height="30" rx="5" class="bar-blue" />
+  <text x="500" y="130" class="txt t-white">10维输入特征向量 x(t)</text>
+
+  <g transform="translate(20, 160)">
+    <rect x="0" y="0" width="460" height="70" class="box-white"/>
+    <rect x="0" y="0" width="460" height="25" class="hdr-blue" rx="4"/>
+    <rect x="0" y="20" width="460" height="5" class="hdr-blue" />
+    <text x="230" y="17" class="txt t-blue">宏观流 LSTM_macro (Macro Stream)</text>
+    <text x="230" y="50" class="txt">2层 LSTM · d<tspan baseline-shift="sub" font-size="10">h</tspan> = 256 · 学习全局功率振幅演化</text>
+    <rect x="0" y="0" width="460" height="70" class="box" pointer-events="none"/>
+  </g>
+
+  <g transform="translate(500, 160)">
+    <rect x="0" y="0" width="480" height="70" class="box-white"/>
+    <rect x="0" y="0" width="480" height="25" class="hdr-blue" rx="4"/>
+    <rect x="0" y="20" width="480" height="5" class="hdr-blue" />
+    <text x="240" y="17" class="txt t-blue">微观流 LSTM_micro (Micro Stream)</text>
+    <text x="240" y="50" class="txt">2层 LSTM · d<tspan baseline-shift="sub" font-size="10">h</tspan> = 256 · 独立权重 · 学习空间分布形状演化</text>
+    <rect x="0" y="0" width="480" height="70" class="box" pointer-events="none"/>
+  </g>
+
+  <line x1="230" y1="230" x2="230" y2="260" class="arrow-line" />
+  <line x1="620" y1="230" x2="620" y2="260" class="arrow-line" />
+
+  <g transform="translate(20, 270)">
+    <rect x="0" y="0" width="340" height="75" class="box-white"/>
+    <rect x="0" y="0" width="340" height="25" class="hdr-green" rx="4"/>
+    <rect x="0" y="20" width="340" height="5" class="hdr-green" />
+    <text x="170" y="17" class="txt t-green">振幅预测 Amplitude Prediction</text>
+    <text x="170" y="45" class="txt-sm">Linear → SiLU → Linear</text>
+    <text x="170" y="65" class="txt-sm">Mode 1 SymLog 预测系数量 â<tspan baseline-shift="sub" font-size="10">1</tspan>(t)</text>
+    <rect x="0" y="0" width="340" height="75" class="box" pointer-events="none"/>
+  </g>
+
+  <g transform="translate(380, 270)">
+    <rect x="0" y="0" width="340" height="75" class="box-white"/>
+    <rect x="0" y="0" width="340" height="25" class="hdr-green" rx="4"/>
+    <rect x="0" y="20" width="340" height="5" class="hdr-green" />
+    <text x="170" y="17" class="txt t-green">形状预测 Shape Prediction</text>
+    <text x="170" y="45" class="txt-sm">全连接网络 + Dropout</text>
+    <text x="170" y="65" class="txt-sm">Mode 2-8 的 7维形状比率 R<tspan baseline-shift="sub" font-size="10">k</tspan>(t)</text>
+    <rect x="0" y="0" width="340" height="75" class="box" pointer-events="none"/>
+  </g>
+
+  <g transform="translate(740, 270)">
+    <rect x="0" y="0" width="240" height="75" class="box-white"/>
+    <rect x="0" y="0" width="240" height="25" class="hdr-green" rx="4"/>
+    <rect x="0" y="20" width="240" height="5" class="hdr-green" />
+    <text x="120" y="17" class="txt t-green">拼接 Concat</text>
+    <text x="120" y="43" class="txt-sm">â<tspan baseline-shift="sub" font-size="10">1</tspan>(t) + 耦合高阶绝对振幅</text>
+    <rect x="0" y="55" width="240" height="20" class="bar-dark" rx="4"/>
+    <rect x="0" y="55" width="240" height="5" class="bar-dark" />
+    <text x="120" y="70" class="txt-sm t-white">8维 POD 系数向量</text>
+    <rect x="0" y="0" width="240" height="75" class="box" pointer-events="none"/>
+  </g>
+
+  <line x1="860" y1="345" x2="860" y2="410" class="arrow-line" />
+
+  <g transform="translate(20, 380)">
+    <rect x="0" y="0" width="340" height="70" class="box-white"/>
+    <rect x="0" y="0" width="340" height="25" class="hdr-purple" rx="4"/>
+    <rect x="0" y="20" width="340" height="5" class="hdr-purple" />
+    <text x="170" y="17" class="txt t-purple">SymLog 逆变换 symlog<tspan baseline-shift="super" font-size="10">-1</tspan></text>
+    <text x="170" y="50" class="txt-sm">从对数空间恢复真实物理量</text>
+    <rect x="0" y="0" width="340" height="70" class="box" pointer-events="none"/>
+  </g>
+
+  <line x1="365" y1="415" x2="430" y2="415" class="arrow-line" />
+
+  <g transform="translate(440, 380)">
+    <rect x="0" y="0" width="540" height="70" class="box-white"/>
+    <rect x="0" y="0" width="540" height="25" class="hdr-purple" rx="4"/>
+    <rect x="0" y="20" width="540" height="5" class="hdr-purple" />
+    <text x="270" y="17" class="txt t-purple">空间投影 Spatial Projection</text>
+
+    <rect x="20" y="35" width="240" height="25" class="hdr-purple" rx="4"/>
+    <rect x="20" y="35" width="240" height="25" class="box" pointer-events="none"/>
+    <text x="140" y="52" class="txt-sm">8个 POD 空间基模式 v<tspan baseline-shift="sub" font-size="10">k</tspan>(r)</text>
+
+    <rect x="280" y="35" width="240" height="25" class="hdr-purple" rx="4"/>
+    <rect x="280" y="35" width="240" height="25" class="box" pointer-events="none"/>
+    <text x="400" y="52" class="txt-sm">8维 POD 系数向量</text>
+
+    <rect x="0" y="0" width="540" height="70" class="box" pointer-events="none"/>
+  </g>
+
+  <line x1="710" y1="450" x2="710" y2="475" class="arrow-line" />
+
+  <g transform="translate(440, 485)">
+    <rect x="0" y="0" width="540" height="35" rx="5" class="bar-blue" />
+    <text x="270" y="22" class="txt t-white">800维中子通量场 Φ(r, t) · 快/热双群 (Fast / Thermal Twin-Group)</text>
+  </g>
+</svg>
